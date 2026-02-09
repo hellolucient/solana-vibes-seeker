@@ -10,6 +10,7 @@ const config = {
   resolver: {
     extraNodeModules: {
       crypto: require.resolve('react-native-get-random-values'),
+      buffer: require.resolve('buffer'),
     },
   },
 };

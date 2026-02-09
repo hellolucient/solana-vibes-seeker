@@ -17,8 +17,8 @@ export function ConnectionProvider({children}: ConnectionProviderProps) {
   const cluster = useWalletStore(state => state.cluster);
 
   const connection = useMemo(() => {
-    // Use environment variable or fallback to public RPC
-    const rpcUrl = process.env.SOLANA_RPC_URL || clusterApiUrl(cluster);
+    // Use public RPC for now - can be configured later
+    const rpcUrl = clusterApiUrl(cluster);
     return new Connection(rpcUrl, 'confirmed');
   }, [cluster]);
 

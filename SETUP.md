@@ -59,6 +59,21 @@ npm run android
 
 ## Common Issues
 
+### App crashes immediately on emulator ("App has stopped")
+
+This can be caused by React Native 0.76 New Architecture + TurboModule issues on emulator. Try:
+
+1. **Disable New Architecture** in `android/gradle.properties`:
+   ```properties
+   newArchEnabled=false
+   ```
+2. Clean and rebuild:
+   ```bash
+   cd android && ./gradlew clean && cd ..
+   npm run android
+   ```
+3. Or run on a **physical device** instead – the APK typically runs more reliably on real hardware.
+
 ### "SDK location not found"
 
 Create `android/local.properties`:
@@ -91,8 +106,13 @@ npm start -- --reset-cache
 To test Mobile Wallet Adapter:
 
 1. Install a wallet app that supports MWA (Phantom, Solflare, etc.)
-2. Run the app on a real device (not emulator)
-3. Tap "Connect Wallet" - it should open your wallet app
+2. **Recommended:** Run on a **real Android device** or **Solana dApp phone** (Saga/Seeker)
+3. For emulator: Install the [Mock MWA Wallet](https://github.com/solana-mobile/mock-wallet) as a testing wallet
+4. Tap "Connect Wallet" - it should open your wallet app
+
+### Installing the APK on a physical device (including Solana Seeker)
+
+**Yes, the APK will work on a physical Solana Seeker/dApp phone.** The app is built for standard Android. Copy the APK to your device and install it (you may need to enable "Install from unknown sources"). Once installed with Phantom or Solflare on the same device, wallet connection will work.
 
 ## Building Release APK
 

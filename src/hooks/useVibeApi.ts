@@ -1,10 +1,30 @@
 import {useCallback} from 'react';
-import {Transaction, VersionedTransaction} from '@solana/web3.js';
-import bs58 from 'bs58';
+import {
+  Transaction,
+  VersionedTransaction,
+  VersionedMessage,
+} from '@solana/web3.js';
 
 // Use your deployed backend
 const API_BASE_URL =
   process.env.API_BASE_URL || 'https://solana-vibes.vercel.app';
+
+/**
+ * Deserialize a transaction from a base64 string.
+ * Handles both legacy and versioned (v0) transactions.
+ */
+function deserializeTransaction(
+  base64Tx: string,
+): Transaction | VersionedTransaction {
+  const txBytes = Buffer.from(base64Tx, 'base64');
+  try {
+    // Try versioned transaction first (v0+)
+    return VersionedTransaction.deserialize(txBytes);
+  } catch {
+    // Fall back to legacy transaction
+    return Transaction.from(txBytes);
+  }
+}
 
 interface PrepareVibeParams {
   targetUsername: string;
@@ -13,7 +33,7 @@ interface PrepareVibeParams {
 
 interface PrepareVibeResult {
   vibeId: string;
-  transaction: Transaction;
+  transaction: Transaction | VersionedTransaction;
 }
 
 interface ConfirmVibeParams {
@@ -33,7 +53,7 @@ interface PrepareClaimParams {
 }
 
 interface PrepareClaimResult {
-  transaction: Transaction;
+  transaction: Transaction | VersionedTransaction;
 }
 
 interface VibeDetails {
@@ -70,9 +90,8 @@ export function useVibeApi() {
 
       const data = await response.json();
 
-      // Deserialize the transaction from base64
-      const txBuffer = Buffer.from(data.transaction, 'base64');
-      const transaction = Transaction.from(txBuffer);
+      // Deserialize the transaction (handles both legacy and versioned)
+      const transaction = deserializeTransaction(data.transaction);
 
       return {
         vibeId: data.vibeId,
@@ -157,9 +176,8 @@ export function useVibeApi() {
 
       const data = await response.json();
 
-      // Deserialize the transaction
-      const txBuffer = Buffer.from(data.transaction, 'base64');
-      const transaction = Transaction.from(txBuffer);
+      // Deserialize the transaction (handles both legacy and versioned)
+      const transaction = deserializeTransaction(data.transaction);
 
       return {
         transaction,

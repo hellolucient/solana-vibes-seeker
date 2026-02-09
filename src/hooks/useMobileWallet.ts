@@ -1,8 +1,5 @@
-import {useCallback} from 'react';
-import {
-  transact,
-  Web3MobileWallet,
-} from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
+import {useCallback, useState} from 'react';
+import {Alert} from 'react-native';
 import {
   Transaction,
   VersionedTransaction,
@@ -11,6 +8,33 @@ import {
 import {useWalletStore} from '../stores/walletStore';
 import {useConnection} from '../providers/ConnectionProvider';
 
+// Lazy load MWA ONLY when user taps Connect
+let mwaCache: {transact: any} | null = null;
+
+function loadMWA(): {transact: any} | null {
+  if (mwaCache !== null) return mwaCache;
+  try {
+    const mwa = require('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+    mwaCache = {transact: mwa.transact};
+    return mwaCache;
+  } catch (e) {
+    console.warn('MWA not available:', e);
+    return null;
+  }
+}
+
+// Decode a base64 string to Uint8Array
+function toUint8Array(base64: string): Uint8Array {
+  const raw = global.atob
+    ? global.atob(base64)
+    : Buffer.from(base64, 'base64').toString('binary');
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) {
+    arr[i] = raw.charCodeAt(i);
+  }
+  return arr;
+}
+
 // App identity for MWA authorization
 const APP_IDENTITY = {
   name: 'Solana Vibes',
@@ -18,11 +42,11 @@ const APP_IDENTITY = {
   icon: 'favicon.ico',
 };
 
-// Cluster mapping for MWA
+// Cluster mapping for MWA (uses raw Solana cluster names)
 const CLUSTER_MAP = {
-  'mainnet-beta': 'solana:mainnet',
-  devnet: 'solana:devnet',
-  testnet: 'solana:testnet',
+  'mainnet-beta': 'mainnet-beta',
+  devnet: 'devnet',
+  testnet: 'testnet',
 } as const;
 
 export function useMobileWallet() {
@@ -36,6 +60,7 @@ export function useMobileWallet() {
     setConnecting,
     disconnect,
   } = useWalletStore();
+  const [error, setError] = useState<string | null>(null);
 
   /**
    * Connect to a wallet using Mobile Wallet Adapter
@@ -43,18 +68,45 @@ export function useMobileWallet() {
   const connect = useCallback(async () => {
     if (connecting || connected) return;
 
+    // Load MWA only when user taps - prevents startup crash
+    const mwa = loadMWA();
+    if (!mwa?.transact) {
+      Alert.alert(
+        'Wallet Not Available',
+        'Mobile Wallet Adapter is not available. Please install a Solana wallet app like Phantom or Solflare.',
+      );
+      return;
+    }
+
     setConnecting(true);
+    setError(null);
 
     try {
-      await transact(async (wallet: Web3MobileWallet) => {
+      let didConnect = false;
+
+      await mwa.transact(async (wallet: any) => {
         // Request authorization
         const authResult = await wallet.authorize({
           cluster: CLUSTER_MAP[cluster],
           identity: APP_IDENTITY,
         });
 
-        // Extract public key from first account
-        const walletPublicKey = new PublicKey(authResult.accounts[0].address);
+        // The MWA protocol returns the address as base64-encoded bytes
+        const addressRaw = authResult.accounts[0].address;
+        let walletPublicKey: PublicKey;
+        try {
+          // Try as base64 first (MWA protocol format)
+          const decoded = toUint8Array(addressRaw);
+          if (decoded.length === 32) {
+            walletPublicKey = new PublicKey(decoded);
+          } else {
+            // Fallback: try as base58 string
+            walletPublicKey = new PublicKey(addressRaw);
+          }
+        } catch {
+          // Final fallback: treat as base58 string directly
+          walletPublicKey = new PublicKey(addressRaw);
+        }
 
         // Store connection state
         setConnected(
@@ -63,11 +115,20 @@ export function useMobileWallet() {
           authResult.wallet_uri_base || 'Mobile Wallet',
           authResult.auth_token,
         );
+        didConnect = true;
       });
-    } catch (error) {
-      console.error('Failed to connect wallet:', error);
+
+      if (!didConnect) {
+        setConnecting(false);
+      }
+    } catch (err: any) {
+      console.error('Failed to connect wallet:', err);
+      setError(err?.message || 'Failed to connect wallet');
       setConnecting(false);
-      throw error;
+      Alert.alert(
+        'Connection Failed',
+        err?.message || 'Failed to connect to wallet. Make sure you have a Solana wallet app installed.',
+      );
     }
   }, [cluster, connecting, connected, setConnected, setConnecting]);
 
@@ -82,9 +143,14 @@ export function useMobileWallet() {
         throw new Error('Wallet not connected');
       }
 
+      const mwa = loadMWA();
+      if (!mwa?.transact) {
+        throw new Error('Mobile Wallet Adapter not available');
+      }
+
       let signature: string = '';
 
-      await transact(async (wallet: Web3MobileWallet) => {
+      await mwa.transact(async (wallet: any) => {
         // Reauthorize with existing token if available
         if (authToken) {
           try {
@@ -130,9 +196,14 @@ export function useMobileWallet() {
         throw new Error('Wallet not connected');
       }
 
+      const mwa = loadMWA();
+      if (!mwa?.transact) {
+        throw new Error('Mobile Wallet Adapter not available');
+      }
+
       let signedTx: T | null = null;
 
-      await transact(async (wallet: Web3MobileWallet) => {
+      await mwa.transact(async (wallet: any) => {
         // Reauthorize
         if (authToken) {
           try {
@@ -179,9 +250,14 @@ export function useMobileWallet() {
         throw new Error('Wallet not connected');
       }
 
+      const mwa = loadMWA();
+      if (!mwa?.transact) {
+        throw new Error('Mobile Wallet Adapter not available');
+      }
+
       let signedMessage: Uint8Array | null = null;
 
-      await transact(async (wallet: Web3MobileWallet) => {
+      await mwa.transact(async (wallet: any) => {
         // Reauthorize
         if (authToken) {
           try {
@@ -229,5 +305,7 @@ export function useMobileWallet() {
     signTransaction,
     signAndSendTransaction,
     signMessage,
+    error,
+    isMWAAvailable: mwaCache !== null,
   };
 }
