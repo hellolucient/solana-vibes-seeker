@@ -161,6 +161,7 @@ interface ConfirmVibeParams {
   signedTransaction: Transaction | VersionedTransaction;
   blockhash: string;
   lastValidBlockHeight: number;
+  claimerWallet?: string;
 }
 
 interface ConfirmVibeResult {
@@ -355,6 +356,7 @@ export function useVibeApi() {
           },
           body: JSON.stringify({
             vibeId: params.vibeId,
+            claimerWallet: params.claimerWallet,
             signedTransaction: txBase64,
             blockhash: params.blockhash,
             lastValidBlockHeight: params.lastValidBlockHeight,

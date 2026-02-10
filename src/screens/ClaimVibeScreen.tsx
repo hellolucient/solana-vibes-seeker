@@ -132,6 +132,7 @@ export function ClaimVibeScreen() {
       // Step 3: Confirm claim
       await confirmClaim({
         vibeId: vibeDetails.id,
+        claimerWallet: publicKey.toBase58(),
         signedTransaction: signedTx,
         blockhash: prepareResult.blockhash,
         lastValidBlockHeight: prepareResult.lastValidBlockHeight,
