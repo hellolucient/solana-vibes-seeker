@@ -46,7 +46,7 @@
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
-            <data android:scheme="https" android:host="solana-vibes.vercel.app" android:pathPrefix="/v/" />
+            <data android:scheme="https" android:host="solana-vibes-seeker.vercel.app" android:pathPrefix="/v/" />
         </intent-filter>
       </activity>
     </application>
