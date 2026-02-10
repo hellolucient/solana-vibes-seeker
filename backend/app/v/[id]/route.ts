@@ -40,11 +40,14 @@ export async function GET(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Solana Vibes</title>
+  <title>solana_vibes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'JetBrains Mono', monospace;
       background: #050505;
       color: #ffffff;
       min-height: 100vh;
@@ -57,84 +60,91 @@ export async function GET(
       text-align: center;
       max-width: 400px;
     }
-    .logo {
-      font-size: 48px;
-      margin-bottom: 8px;
-    }
     h1 {
+      font-family: 'JetBrains Mono', monospace;
       font-size: 28px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      color: #14F195;
+      font-weight: 400;
+      margin-bottom: 12px;
+      color: #ffffff;
+      letter-spacing: -0.5px;
     }
-    .subtitle {
-      font-size: 14px;
-      color: #888888;
-      margin-bottom: 24px;
+    .tagline {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 400;
+      color: #00ff00;
+      margin-bottom: 32px;
+      letter-spacing: 0.5px;
     }
     .vibe-info {
-      font-size: 16px;
+      font-size: 14px;
       color: rgba(255,255,255,0.6);
-      margin-bottom: 24px;
-      padding: 16px;
-      background: rgba(20,241,149,0.08);
-      border: 1px solid rgba(20,241,149,0.15);
-      border-radius: 12px;
+      margin-bottom: 28px;
+      padding: 14px 18px;
+      background: rgba(20,241,149,0.06);
+      border: 1px solid rgba(20,241,149,0.12);
+      border-radius: 8px;
     }
     .vibe-info strong {
       color: #14F195;
     }
     .open-btn {
       display: inline-block;
-      padding: 14px 32px;
-      background: #14F195;
-      color: #0a0a0a;
-      font-size: 16px;
-      font-weight: 700;
-      border-radius: 12px;
+      padding: 10px 28px;
+      background: transparent;
+      color: #14F195;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid rgba(20,241,149,0.3);
+      border-radius: 6px;
       text-decoration: none;
       margin-bottom: 16px;
-      transition: opacity 0.2s;
+      transition: all 0.2s;
+      letter-spacing: 0.3px;
     }
-    .open-btn:hover { opacity: 0.9; }
+    .open-btn:hover {
+      background: rgba(20,241,149,0.08);
+      border-color: #14F195;
+    }
     .divider {
-      color: #666666;
-      font-size: 13px;
-      margin: 16px 0;
+      color: rgba(255,255,255,0.25);
+      font-size: 12px;
+      margin: 20px 0;
     }
     .get-app {
       display: inline-block;
-      padding: 12px 28px;
-      background: #1a1a1a;
+      padding: 10px 24px;
+      background: transparent;
       border: 1px solid #333333;
-      color: rgba(255,255,255,0.7);
-      font-size: 14px;
-      font-weight: 500;
-      border-radius: 12px;
-      text-decoration: none;
-      transition: border-color 0.2s, color 0.2s;
-    }
-    .get-app:hover { border-color: #14F195; color: #ffffff; }
-    .footer {
-      margin-top: 32px;
+      color: rgba(255,255,255,0.5);
+      font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
-      color: rgba(255,255,255,0.3);
+      font-weight: 400;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .get-app:hover { border-color: rgba(255,255,255,0.4); color: #ffffff; }
+    .footer {
+      margin-top: 40px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.2);
     }
     .footer span {
-      color: #9F6AFF;
+      color: rgba(159,106,255,0.5);
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="logo">✨</div>
-    <h1>Solana Vibes</h1>
-    <p class="subtitle">Mobile-first NFT vibes on Solana</p>
+    <h1>solana_vibes</h1>
+    <p class="tagline">mint vibe &middot; share vibe &middot; claim vibe</p>
     ${vibeInfo}
-    <a href="${deepLink}" class="open-btn">Open in App</a>
-    <p class="divider">Don't have the app yet?</p>
-    <a href="${githubUrl}/releases" class="get-app">Get Solana Vibes for Android</a>
-    <p class="footer">Built for <span>Solana Mobile</span></p>
+    <a href="${deepLink}" class="open-btn">&gt; open in app</a>
+    <p class="divider">don't have the app yet?</p>
+    <a href="${githubUrl}/releases" class="get-app">get solana_vibes for android</a>
+    <p class="footer">built for <span>solana mobile</span></p>
   </div>
   <script>
     // Attempt to open the app automatically via custom scheme
