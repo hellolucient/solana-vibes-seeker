@@ -225,11 +225,32 @@ export function useMobileWallet() {
         }
 
         // Sign the transaction
-        const signedTxs = await wallet.signTransactions({
-          transactions: [transaction],
-        });
+        // The web3js MWA adapter accepts Transaction[] directly
+        let signedTxs: any[];
+        try {
+          // Try web3js wrapper format first (Transaction[])
+          signedTxs = await wallet.signTransactions({
+            transactions: [transaction],
+          });
+        } catch {
+          // Fallback: some versions accept the array directly
+          signedTxs = await wallet.signTransactions([transaction]);
+        }
 
-        signedTx = signedTxs[0] as T;
+        const result = signedTxs[0];
+
+        // Handle the case where MWA returns raw bytes instead of Transaction objects
+        if (result instanceof Uint8Array || ArrayBuffer.isView(result)) {
+          // Re-deserialize from raw bytes
+          const bytes = Buffer.from(result as Uint8Array);
+          try {
+            signedTx = VersionedTransaction.deserialize(bytes) as T;
+          } catch {
+            signedTx = Transaction.from(bytes) as T;
+          }
+        } else {
+          signedTx = result as T;
+        }
       });
 
       if (!signedTx) {

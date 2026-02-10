@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -7,19 +7,26 @@ import {
   ActivityIndicator,
   Image,
   Alert,
-  Linking,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import type {RouteProp} from '@react-navigation/native';
 import {useMobileWallet} from '../hooks/useMobileWallet';
 import {useVibeApi} from '../hooks/useVibeApi';
-import {WalletButton} from '../components/WalletButton';
 import type {RootStackParamList} from '../navigation/RootNavigator';
 
 type ClaimVibeRouteProp = RouteProp<RootStackParamList, 'ClaimVibe'>;
 
-type ClaimState = 'loading' | 'ready' | 'verifying' | 'claiming' | 'success' | 'error';
+type ClaimState =
+  | 'loading'
+  | 'ready'
+  | 'preparing'
+  | 'signing'
+  | 'confirming'
+  | 'success'
+  | 'error';
 
 interface VibeDetails {
   id: string;
@@ -29,19 +36,21 @@ interface VibeDetails {
   vibeNumber: number;
   imageUrl: string;
   claimStatus: 'pending' | 'claimed';
+  mintAddress?: string;
 }
 
 export function ClaimVibeScreen() {
   const route = useRoute<ClaimVibeRouteProp>();
   const navigation = useNavigation();
-  const {connected, publicKey, signTransaction} = useMobileWallet();
+  const {connected, publicKey, connect, disconnect, signTransaction} =
+    useMobileWallet();
   const {getVibeDetails, prepareClaim, confirmClaim} = useVibeApi();
 
   const [claimState, setClaimState] = useState<ClaimState>('loading');
   const [vibeDetails, setVibeDetails] = useState<VibeDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [xVerified, setXVerified] = useState(false);
 
+  const stepRef = useRef<string>('idle');
   const {vibeId} = route.params;
 
   // Fetch vibe details on mount
@@ -50,7 +59,6 @@ export function ClaimVibeScreen() {
       try {
         const details = await getVibeDetails(vibeId);
         setVibeDetails(details);
-
         if (details.claimStatus === 'claimed') {
           setClaimState('success');
         } else {
@@ -62,40 +70,29 @@ export function ClaimVibeScreen() {
         setClaimState('error');
       }
     }
-
     fetchDetails();
   }, [vibeId, getVibeDetails]);
 
-  const handleVerifyX = async () => {
-    // In a real implementation, this would:
-    // 1. Open X OAuth flow
-    // 2. Verify the user owns the target username
-    // For now, we'll simulate with an alert
-    Alert.alert(
-      'Verify X Account',
-      `To claim this vibe, verify you own @${vibeDetails?.targetUsername}`,
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Verify',
-          onPress: () => setXVerified(true),
-        },
-      ],
-    );
-  };
+  const shortenedAddress = publicKey
+    ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
+    : '';
 
-  const handleClaim = async () => {
+  const handleConnect = useCallback(async () => {
+    try {
+      await connect();
+    } catch (err) {
+      console.error('Failed to connect:', err);
+    }
+  }, [connect]);
+
+  const handleClaim = useCallback(async () => {
     if (!connected || !publicKey || !vibeDetails) {
       Alert.alert('Connect Wallet', 'Please connect your wallet to claim');
       return;
     }
 
-    if (!xVerified) {
-      handleVerifyX();
-      return;
-    }
-
-    setClaimState('claiming');
+    setClaimState('preparing');
+    stepRef.current = 'preparing';
     setError(null);
 
     try {
@@ -105,26 +102,50 @@ export function ClaimVibeScreen() {
         claimerWallet: publicKey.toBase58(),
       });
 
+      setClaimState('signing');
+      stepRef.current = 'signing';
+
       // Step 2: Sign with wallet
       const signedTx = await signTransaction(prepareResult.transaction);
+
+      setClaimState('confirming');
+      stepRef.current = 'confirming';
 
       // Step 3: Confirm claim
       await confirmClaim({
         vibeId: vibeDetails.id,
         signedTransaction: signedTx,
+        blockhash: prepareResult.blockhash,
+        lastValidBlockHeight: prepareResult.lastValidBlockHeight,
       });
 
       setClaimState('success');
     } catch (err) {
       console.error('Claim error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to claim vibe');
+      const message =
+        err instanceof Error ? err.message : 'Something went wrong';
+      setError(`Error while ${stepRef.current}: ${message}`);
       setClaimState('ready');
     }
-  };
+  }, [connected, publicKey, vibeDetails, prepareClaim, confirmClaim, signTransaction]);
 
   const handleClose = () => {
     navigation.goBack();
   };
+
+  const isProcessing =
+    claimState === 'preparing' ||
+    claimState === 'signing' ||
+    claimState === 'confirming';
+
+  const processingMessage =
+    claimState === 'preparing'
+      ? 'Preparing claim...'
+      : claimState === 'signing'
+      ? 'Waiting for signature...'
+      : claimState === 'confirming'
+      ? 'Confirming on Solana...'
+      : '';
 
   // Loading state
   if (claimState === 'loading') {
@@ -139,132 +160,146 @@ export function ClaimVibeScreen() {
   }
 
   // Error state
-  if (claimState === 'error') {
+  if (claimState === 'error' && !vibeDetails) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleClose}>
-            <Text style={styles.closeButton}>✕</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.centerContent}>
-          <Text style={styles.errorEmoji}>😕</Text>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.title}>solana_vibes</Text>
           <Text style={styles.errorTitle}>Couldn't load vibe</Text>
           <Text style={styles.errorMessage}>{error}</Text>
-        </View>
+          <TouchableOpacity style={styles.btnOutline} onPress={handleClose}>
+            <Text style={styles.btnOutlineText}>Go Back</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
-  // Success state (already claimed)
-  if (claimState === 'success') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleClose}>
-            <Text style={styles.closeButton}>✕</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.successContent}>
-          <Text style={styles.successEmoji}>🎉</Text>
-          <Text style={styles.successTitle}>Vibe Claimed!</Text>
-          <Text style={styles.successSubtitle}>
-            This NFT is now in your wallet
-          </Text>
-
-          {vibeDetails?.imageUrl && (
-            <Image
-              source={{uri: vibeDetails.imageUrl}}
-              style={styles.vibeImage}
-              resizeMode="contain"
-            />
-          )}
-
-          <TouchableOpacity style={styles.primaryButton} onPress={handleClose}>
-            <Text style={styles.primaryButtonText}>Done</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Ready to claim state
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleClose}>
-          <Text style={styles.closeButton}>✕</Text>
-        </TouchableOpacity>
-        <WalletButton />
-      </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        {/* Title */}
+        <Text style={styles.title}>solana_vibes</Text>
 
-      <View style={styles.claimContent}>
-        <Text style={styles.claimTitle}>You've Got a Vibe! ✨</Text>
-        <Text style={styles.claimSubtitle}>
-          Someone sent you a unique NFT on Solana
-        </Text>
-
+        {/* NFT Image */}
         {vibeDetails?.imageUrl && (
           <Image
             source={{uri: vibeDetails.imageUrl}}
-            style={styles.vibeImage}
-            resizeMode="contain"
+            style={styles.nftImage}
+            resizeMode="cover"
           />
         )}
 
-        <View style={styles.vibeInfo}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>For</Text>
-            <Text style={styles.infoValue}>@{vibeDetails?.targetUsername}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>From</Text>
-            <Text style={styles.infoValue}>{vibeDetails?.maskedWallet}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Vibe #</Text>
-            <Text style={styles.infoValue}>{vibeDetails?.vibeNumber}</Text>
-          </View>
+        {/* Terminal-style info */}
+        <View style={styles.terminalInfo}>
+          <Text style={styles.terminalLine}>
+            {'> '}
+            <Text style={styles.terminalGreen}>received solana_vibes</Text>
+          </Text>
+          <Text style={styles.terminalLine}>
+            {'> '}
+            <Text style={styles.terminalGreen}>
+              verified by wallet {vibeDetails?.maskedWallet}
+            </Text>
+          </Text>
+          {vibeDetails?.mintAddress && (
+            <Text style={styles.terminalLine}>
+              {'> '}
+              <Text style={styles.terminalGreen}>
+                mint {vibeDetails.mintAddress.slice(0, 4)}...
+                {vibeDetails.mintAddress.slice(-4)}
+              </Text>
+            </Text>
+          )}
+          <Text style={styles.terminalLine}>
+            {'> '}
+            <Text style={styles.terminalGreen}>
+              for @{vibeDetails?.targetUsername}
+            </Text>
+          </Text>
         </View>
 
-        {!connected ? (
-          <View style={styles.stepBox}>
-            <Text style={styles.stepLabel}>Step 1: Connect Wallet</Text>
-            <WalletButton variant="large" />
-          </View>
-        ) : !xVerified ? (
-          <View style={styles.stepBox}>
-            <Text style={styles.stepLabel}>Step 2: Verify X Account</Text>
-            <TouchableOpacity
-              style={styles.verifyButton}
-              onPress={handleVerifyX}>
-              <Text style={styles.verifyButtonText}>
-                Verify @{vibeDetails?.targetUsername}
-              </Text>
-            </TouchableOpacity>
+        {/* Claimed state */}
+        {claimState === 'success' ? (
+          <View style={styles.claimedSection}>
+            <View style={styles.claimedBadge}>
+              <Text style={styles.claimedBadgeTitle}>✓ Claimed</Text>
+              <Text style={styles.claimedBadgeSub}>by {shortenedAddress}</Text>
+            </View>
+
+            <View style={styles.spreadSection}>
+              <Text style={styles.spreadTitle}>Spread the vibes! 🌊</Text>
+              <TouchableOpacity style={styles.btnOutline}>
+                <Text style={styles.btnOutlineIcon}>𝕏</Text>
+                <Text style={styles.btnOutlineText}>Thank the sender</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnSendOwn}
+                onPress={handleClose}>
+                <Text style={styles.btnSendOwnText}>Send your own vibe</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleClaim}
-            disabled={claimState === 'claiming'}>
-            {claimState === 'claiming' ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator color="#0a0a0a" size="small" />
-                <Text style={styles.primaryButtonText}>Claiming...</Text>
-              </View>
-            ) : (
-              <Text style={styles.primaryButtonText}>Claim Vibe (~0.001 SOL)</Text>
-            )}
-          </TouchableOpacity>
-        )}
+          <View style={styles.claimSection}>
+            {/* Who this vibe is for */}
+            <Text style={styles.vibeForText}>
+              This vibe is for{' '}
+              <Text style={styles.vibeForUsername}>
+                @{vibeDetails?.targetUsername}
+              </Text>
+            </Text>
 
-        {error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+            {/* Connect wallet if needed */}
+            {!connected ? (
+              <TouchableOpacity
+                style={styles.btnClaim}
+                onPress={handleConnect}
+                activeOpacity={0.8}>
+                <Text style={styles.btnClaimText}>Connect wallet to claim</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.btnClaim, isProcessing && styles.btnClaimProcessing]}
+                onPress={handleClaim}
+                disabled={isProcessing}
+                activeOpacity={0.8}>
+                {isProcessing ? (
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator color="#ffffff" size="small" />
+                    <Text style={styles.btnClaimText}>{processingMessage}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.btnClaimText}>confirm claim</Text>
+                )}
+              </TouchableOpacity>
+            )}
+
+            <Text style={styles.feeText}>Claim fee: ~0.001 SOL</Text>
+
+            {/* Error */}
+            {error && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorBoxText}>{error}</Text>
+              </View>
+            )}
+
+            {/* Disconnect / Cancel */}
+            {connected && (
+              <TouchableOpacity
+                style={styles.linkBtn}
+                onPress={disconnect}>
+                <Text style={styles.linkBtnText}>Disconnect wallet</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.linkBtn} onPress={handleClose}>
+              <Text style={styles.linkBtnText}>cancel</Text>
+            </TouchableOpacity>
           </View>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -272,157 +307,217 @@ export function ClaimVibeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  closeButton: {
-    fontSize: 24,
-    color: '#888888',
+    backgroundColor: '#050505',
   },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
   },
   loadingText: {
     fontSize: 16,
-    color: '#888888',
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 16,
   },
-  errorEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  errorMessage: {
-    fontSize: 14,
-    color: '#888888',
-    textAlign: 'center',
-  },
-  successContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 32,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
     alignItems: 'center',
   },
-  successEmoji: {
-    fontSize: 48,
+
+  // Title
+  title: {
+    fontSize: 22,
+    fontWeight: '300',
+    letterSpacing: 1.5,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+    marginTop: 20,
     marginBottom: 16,
   },
-  successTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  successSubtitle: {
-    fontSize: 16,
-    color: '#888888',
-    marginBottom: 24,
-  },
-  claimContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  claimTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  claimSubtitle: {
-    fontSize: 16,
-    color: '#888888',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  vibeImage: {
+
+  // NFT Image
+  nftImage: {
     width: '100%',
-    height: 200,
-    borderRadius: 12,
-    backgroundColor: '#1a1a1a',
-    marginBottom: 24,
+    height: 250,
+    borderRadius: 8,
+    backgroundColor: '#0a0a0a',
+    marginBottom: 20,
   },
-  vibeInfo: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#333333',
+
+  // Terminal info
+  terminalInfo: {
+    width: '100%',
+    marginBottom: 20,
   },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  terminalLine: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+    lineHeight: 24,
+    fontFamily: Platform.OS === 'android' ? 'monospace' : 'Menlo',
+  },
+  terminalGreen: {
+    color: '#14F195',
+  },
+
+  // Claim section
+  claimSection: {
+    width: '100%',
     alignItems: 'center',
-    paddingVertical: 8,
   },
-  infoLabel: {
-    fontSize: 14,
-    color: '#888888',
+  vibeForText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    marginBottom: 20,
   },
-  infoValue: {
-    fontSize: 14,
-    color: '#ffffff',
+  vibeForUsername: {
+    color: '#14F195',
     fontWeight: '600',
   },
-  stepBox: {
-    alignItems: 'center',
-  },
-  stepLabel: {
-    fontSize: 14,
-    color: '#888888',
-    marginBottom: 12,
-  },
-  verifyButton: {
-    backgroundColor: '#1DA1F2',
+
+  // Claim button
+  btnClaim: {
+    width: '100%',
+    paddingVertical: 18,
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  verifyButtonText: {
+  btnClaimProcessing: {
+    opacity: 0.7,
+  },
+  btnClaimText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '500',
     color: '#ffffff',
-  },
-  primaryButton: {
-    backgroundColor: '#14F195',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0a0a0a',
   },
   loadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  feeText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.25)',
+    marginTop: 12,
+  },
+
+  // Links
+  linkBtn: {
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  linkBtnText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.3)',
+    textAlign: 'center',
+  },
+
+  // Error
   errorBox: {
-    backgroundColor: '#ff4444',
+    width: '100%',
+    backgroundColor: 'rgba(255,68,68,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,68,68,0.25)',
     borderRadius: 8,
     padding: 12,
     marginTop: 16,
   },
-  errorText: {
-    color: '#ffffff',
+  errorBoxText: {
+    color: '#ff6b6b',
     fontSize: 14,
     textAlign: 'center',
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+
+  // Claimed / Success
+  claimedSection: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  claimedBadge: {
+    width: '100%',
+    backgroundColor: 'rgba(20,241,149,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,241,149,0.25)',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  claimedBadgeTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#14F195',
+  },
+  claimedBadgeSub: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 4,
+  },
+  spreadSection: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    padding: 20,
+    alignItems: 'center',
+  },
+  spreadTitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 16,
+  },
+  btnOutline: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 10,
+  },
+  btnOutlineIcon: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  btnOutlineText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  btnSendOwn: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: 'rgba(20,241,149,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,241,149,0.2)',
+  },
+  btnSendOwnText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#14F195',
   },
 });

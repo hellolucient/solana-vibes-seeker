@@ -13,13 +13,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
   ],
   config: {
     screens: {
-      MainTabs: {
-        screens: {
-          Home: 'home',
-          Send: 'send',
-          Profile: 'profile',
-        },
-      },
+      Main: 'home',
       ClaimVibe: {
         path: 'v/:vibeId',
         parse: {

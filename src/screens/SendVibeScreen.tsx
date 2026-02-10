@@ -63,6 +63,8 @@ export function SendVibeScreen() {
       const confirmResult = await confirmVibe({
         vibeId: prepareResult.vibeId,
         signedTransaction: signedTx,
+        blockhash: prepareResult.blockhash,
+        lastValidBlockHeight: prepareResult.lastValidBlockHeight,
       });
 
       // Success!
@@ -73,7 +75,14 @@ export function SendVibeScreen() {
       });
     } catch (err) {
       console.error('Send vibe error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to send vibe');
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      // Add context about which step failed
+      const step = sendState === 'preparing'
+        ? 'preparing'
+        : sendState === 'signing'
+        ? 'signing'
+        : 'confirming';
+      setError(`Error while ${step}: ${message}`);
       setSendState('idle');
     }
   };

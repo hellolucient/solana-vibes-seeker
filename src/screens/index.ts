@@ -1,4 +1,2 @@
-export {HomeScreen} from './HomeScreen';
-export {SendVibeScreen} from './SendVibeScreen';
+export {MainScreen} from './MainScreen';
 export {ClaimVibeScreen} from './ClaimVibeScreen';
-export {ProfileScreen} from './ProfileScreen';
