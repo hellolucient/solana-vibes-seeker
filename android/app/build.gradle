@@ -142,3 +142,11 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Pin androidx.browser to a version compatible with compileSdk 35
+// (react-native-inappbrowser-reborn transitively pulls in 1.10.0-alpha02 which needs SDK 36)
+configurations.all {
+    resolutionStrategy {
+        force 'androidx.browser:browser:1.8.0'
+    }
+}

@@ -1,12 +1,13 @@
 import React, {useEffect, useState} from 'react';
-import {StatusBar, View, Text, StyleSheet} from 'react-native';
+import {StatusBar, View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {NavigationContainer} from '@react-navigation/native';
 import {RootNavigator} from './navigation/RootNavigator';
 import {ConnectionProvider} from './providers/ConnectionProvider';
 import {linking} from './utils/linking';
+import {useWalletStore} from './stores/walletStore';
 
-// Error boundary component
+// Error boundary component — recoverable so users aren't stuck
 class ErrorBoundary extends React.Component<
   {children: React.ReactNode},
   {hasError: boolean; error: Error | null}
@@ -24,6 +25,10 @@ class ErrorBoundary extends React.Component<
     console.error('App Error:', error, errorInfo);
   }
 
+  handleRetry = () => {
+    this.setState({hasError: false, error: null});
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -32,6 +37,12 @@ class ErrorBoundary extends React.Component<
           <Text style={errorStyles.message}>
             {this.state.error?.message || 'Unknown error'}
           </Text>
+          <TouchableOpacity
+            style={errorStyles.retryBtn}
+            onPress={this.handleRetry}
+            activeOpacity={0.8}>
+            <Text style={errorStyles.retryBtnText}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -57,6 +68,20 @@ const errorStyles = StyleSheet.create({
     fontSize: 14,
     color: '#888888',
     textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  retryBtnText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ffffff',
   },
 });
 
@@ -64,9 +89,13 @@ export default function App(): React.JSX.Element {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Small delay to ensure all native modules are loaded
-    const timer = setTimeout(() => setIsReady(true), 100);
-    return () => clearTimeout(timer);
+    // Hydrate persisted wallet state, then mark ready
+    async function init() {
+      await useWalletStore.getState().hydrate();
+      // Small extra delay to ensure all native modules are loaded
+      setTimeout(() => setIsReady(true), 50);
+    }
+    init();
   }, []);
 
   if (!isReady) {

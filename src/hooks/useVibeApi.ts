@@ -363,11 +363,47 @@ export function useVibeApi() {
     [],
   );
 
+  /**
+   * Check if a given X username has a pending or claimed vibe.
+   * Calls GET /api/vibe/pending/by-username?username=...
+   * Returns { hasPending, hasClaimed, vibeId, vibeUrl, mintAddress, solscanUrl } or null.
+   */
+  const lookupVibeForUser = useCallback(
+    async (username: string): Promise<{
+      hasPending: boolean;
+      hasClaimed: boolean;
+      vibeId?: string;
+      vibeUrl?: string;
+      mintAddress?: string;
+      solscanUrl?: string;
+      senderWallet?: string;
+    } | null> => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/vibe/pending/by-username?username=${encodeURIComponent(username)}`,
+          {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'},
+          },
+        );
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (!data.hasPending && !data.hasClaimed) return null;
+        return data;
+      } catch {
+        // Endpoint unavailable — silently return null
+        return null;
+      }
+    },
+    [],
+  );
+
   return {
     prepareVibe,
     confirmVibe,
     getVibeDetails,
     prepareClaim,
     confirmClaim,
+    lookupVibeForUser,
   };
 }

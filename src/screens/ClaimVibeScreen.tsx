@@ -13,8 +13,10 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import type {RouteProp} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useMobileWallet} from '../hooks/useMobileWallet';
 import {useVibeApi} from '../hooks/useVibeApi';
+import {VibeSpinner} from '../components/VibeSpinner';
 import type {RootStackParamList} from '../navigation/RootNavigator';
 
 type ClaimVibeRouteProp = RouteProp<RootStackParamList, 'ClaimVibe'>;
@@ -39,9 +41,11 @@ interface VibeDetails {
   mintAddress?: string;
 }
 
+type ClaimVibeNavProp = NativeStackNavigationProp<RootStackParamList, 'ClaimVibe'>;
+
 export function ClaimVibeScreen() {
   const route = useRoute<ClaimVibeRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<ClaimVibeNavProp>();
   const {connected, publicKey, connect, disconnect, signTransaction} =
     useMobileWallet();
   const {getVibeDetails, prepareClaim, confirmClaim} = useVibeApi();
@@ -133,6 +137,11 @@ export function ClaimVibeScreen() {
     navigation.goBack();
   };
 
+  /** Navigate to home screen (Main) — full stack reset so MainScreen starts fresh */
+  const handleGoHome = () => {
+    navigation.reset({index: 0, routes: [{name: 'Main'}]});
+  };
+
   const isProcessing =
     claimState === 'preparing' ||
     claimState === 'signing' ||
@@ -152,7 +161,7 @@ export function ClaimVibeScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContent}>
-          <ActivityIndicator color="#14F195" size="large" />
+          <VibeSpinner size={56} />
           <Text style={styles.loadingText}>Loading vibe...</Text>
         </View>
       </SafeAreaView>
@@ -164,7 +173,12 @@ export function ClaimVibeScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.title}>solana_vibes</Text>
+          <TouchableOpacity
+            onPress={handleGoHome}
+            activeOpacity={0.7}
+            hitSlop={{top: 12, bottom: 12, left: 24, right: 24}}>
+            <Text style={styles.title}>solana_vibes</Text>
+          </TouchableOpacity>
           <Text style={styles.errorTitle}>Couldn't load vibe</Text>
           <Text style={styles.errorMessage}>{error}</Text>
           <TouchableOpacity style={styles.btnOutline} onPress={handleClose}>
@@ -180,8 +194,13 @@ export function ClaimVibeScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Title */}
-        <Text style={styles.title}>solana_vibes</Text>
+        {/* Title — tap to go home */}
+        <TouchableOpacity
+          onPress={handleGoHome}
+          activeOpacity={0.7}
+          hitSlop={{top: 12, bottom: 12, left: 24, right: 24}}>
+          <Text style={styles.title}>solana_vibes</Text>
+        </TouchableOpacity>
 
         {/* NFT Image */}
         {vibeDetails?.imageUrl && (
@@ -268,7 +287,7 @@ export function ClaimVibeScreen() {
                 activeOpacity={0.8}>
                 {isProcessing ? (
                   <View style={styles.loadingRow}>
-                    <ActivityIndicator color="#ffffff" size="small" />
+                    <VibeSpinner size={24} />
                     <Text style={styles.btnClaimText}>{processingMessage}</Text>
                   </View>
                 ) : (
@@ -286,14 +305,7 @@ export function ClaimVibeScreen() {
               </View>
             )}
 
-            {/* Disconnect / Cancel */}
-            {connected && (
-              <TouchableOpacity
-                style={styles.linkBtn}
-                onPress={disconnect}>
-                <Text style={styles.linkBtnText}>Disconnect wallet</Text>
-              </TouchableOpacity>
-            )}
+            {/* Cancel */}
             <TouchableOpacity style={styles.linkBtn} onPress={handleClose}>
               <Text style={styles.linkBtnText}>cancel</Text>
             </TouchableOpacity>
@@ -325,15 +337,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Title
+  // Title — paddingVertical expands the actual tappable area
   title: {
     fontSize: 22,
     fontWeight: '300',
     letterSpacing: 1.5,
     color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
-    marginTop: 20,
-    marginBottom: 16,
+    paddingVertical: 12,
+    marginTop: 8,
+    marginBottom: 4,
   },
 
   // NFT Image
