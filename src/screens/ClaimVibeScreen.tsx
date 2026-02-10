@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, useNavigation} from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {RouteProp} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useMobileWallet} from '../hooks/useMobileWallet';
@@ -53,9 +54,17 @@ export function ClaimVibeScreen() {
   const [claimState, setClaimState] = useState<ClaimState>('loading');
   const [vibeDetails, setVibeDetails] = useState<VibeDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [xUsername, setXUsername] = useState<string | null>(null);
 
   const stepRef = useRef<string>('idle');
   const {vibeId} = route.params;
+
+  // Load X username from storage
+  useEffect(() => {
+    AsyncStorage.getItem('@solanavibes/x_username').then(val => {
+      if (val) setXUsername(val);
+    });
+  }, []);
 
   // Fetch vibe details on mount
   useEffect(() => {
@@ -94,6 +103,10 @@ export function ClaimVibeScreen() {
       Alert.alert('Connect Wallet', 'Please connect your wallet to claim');
       return;
     }
+    if (!xUsername) {
+      Alert.alert('Connect X', 'Please connect your X account first');
+      return;
+    }
 
     setClaimState('preparing');
     stepRef.current = 'preparing';
@@ -104,6 +117,7 @@ export function ClaimVibeScreen() {
       const prepareResult = await prepareClaim({
         vibeId: vibeDetails.id,
         claimerWallet: publicKey.toBase58(),
+        xUsername,
       });
 
       setClaimState('signing');
@@ -131,7 +145,7 @@ export function ClaimVibeScreen() {
       setError(`Error while ${stepRef.current}: ${message}`);
       setClaimState('ready');
     }
-  }, [connected, publicKey, vibeDetails, prepareClaim, confirmClaim, signTransaction]);
+  }, [connected, publicKey, vibeDetails, xUsername, prepareClaim, confirmClaim, signTransaction]);
 
   const handleClose = () => {
     navigation.goBack();

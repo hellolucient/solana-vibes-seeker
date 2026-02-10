@@ -20,35 +20,8 @@ import { X_USER_COOKIE } from "@/lib/x-oauth-1";
 export async function POST(req: NextRequest) {
   console.log("[vibe/claim/prepare] Request start");
 
-  // Get the X user from cookie
-  const cookieStore = await cookies();
-  const userCookie = cookieStore.get(X_USER_COOKIE)?.value;
-
-  if (!userCookie) {
-    return NextResponse.json(
-      { error: "Not authenticated with X. Please connect your X account first." },
-      { status: 401 }
-    );
-  }
-
-  // Parse the user info from cookie
-  let xUser: { id: string; username: string };
-  try {
-    const parsed = JSON.parse(userCookie);
-    if (!parsed.username) {
-      throw new Error("No username in cookie");
-    }
-    xUser = { id: parsed.id, username: parsed.username };
-  } catch (e) {
-    console.error("[vibe/claim/prepare] Invalid X user cookie:", e);
-    return NextResponse.json(
-      { error: "X authentication failed. Please reconnect your X account." },
-      { status: 401 }
-    );
-  }
-
   // Parse request body
-  let body: { vibeId: string; claimerWallet: string };
+  let body: { vibeId: string; claimerWallet: string; xUsername?: string };
   try {
     body = await req.json();
   } catch {
@@ -56,6 +29,35 @@ export async function POST(req: NextRequest) {
   }
 
   const { vibeId, claimerWallet } = body;
+
+  // Get X username: prefer body param (mobile), fall back to cookie (web)
+  let xUser: { id: string; username: string } | null = null;
+
+  if (body.xUsername) {
+    // Mobile app sends username directly
+    xUser = { id: "", username: body.xUsername };
+  } else {
+    // Web app sends via cookie
+    const cookieStore = await cookies();
+    const userCookie = cookieStore.get(X_USER_COOKIE)?.value;
+    if (userCookie) {
+      try {
+        const parsed = JSON.parse(userCookie);
+        if (parsed.username) {
+          xUser = { id: parsed.id, username: parsed.username };
+        }
+      } catch (e) {
+        console.error("[vibe/claim/prepare] Invalid X user cookie:", e);
+      }
+    }
+  }
+
+  if (!xUser) {
+    return NextResponse.json(
+      { error: "Not authenticated with X. Please connect your X account first." },
+      { status: 401 }
+    );
+  }
   if (!vibeId || !claimerWallet) {
     return NextResponse.json(
       { error: "Missing vibeId or claimerWallet" },

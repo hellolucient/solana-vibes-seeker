@@ -172,6 +172,7 @@ interface ConfirmVibeResult {
 interface PrepareClaimParams {
   vibeId: string;
   claimerWallet: string;
+  xUsername: string;
 }
 
 interface PrepareClaimResult {
@@ -188,6 +189,7 @@ interface VibeDetails {
   vibeNumber: number;
   imageUrl: string;
   claimStatus: 'pending' | 'claimed';
+  mintAddress?: string;
 }
 
 export function useVibeApi() {
@@ -287,7 +289,12 @@ export function useVibeApi() {
         );
       }
 
-      return response.json();
+      const data = await response.json();
+      // Map backend field names to what the app expects
+      return {
+        ...data,
+        imageUrl: data.imageUri || data.imageUrl || '',
+      };
     },
     [],
   );
@@ -305,6 +312,7 @@ export function useVibeApi() {
         body: JSON.stringify({
           vibeId: params.vibeId,
           claimerWallet: params.claimerWallet,
+          xUsername: params.xUsername,
         }),
       });
 
