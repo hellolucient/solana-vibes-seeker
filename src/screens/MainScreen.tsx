@@ -18,9 +18,12 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useMobileWallet} from '../hooks/useMobileWallet';
 import {useVibeApi} from '../hooks/useVibeApi';
 import {VibeSpinner} from '../components/VibeSpinner';
+import type {RootStackParamList} from '../navigation/RootNavigator';
 
 const X_AUTH_BASE = 'https://solana-vibes-seeker.vercel.app/api/auth/x';
 const X_AUTH_RETURN = 'solanavibes://auth/x';
@@ -52,6 +55,7 @@ const vibesImage = require('../assets/vibes-base.png');
 type SendState = 'idle' | 'preparing' | 'signing' | 'confirming' | 'success';
 
 export function MainScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {connected, connecting, publicKey, connect, disconnect, signTransaction} =
     useMobileWallet();
   const {prepareVibe, confirmVibe, lookupVibeForUser} = useVibeApi();
@@ -491,11 +495,11 @@ export function MainScreen() {
                       : styles.vibeBannerPending,
                   ]}
                   onPress={() => {
-                    // Open Solscan for claimed vibes, or the claim page for pending ones
+                    // Open Solscan for claimed vibes, or navigate to claim screen for pending ones
                     if (pendingVibe.claimStatus === 'claimed' && pendingVibe.solscanUrl) {
                       Linking.openURL(pendingVibe.solscanUrl);
-                    } else if (pendingVibe.vibeUrl) {
-                      Linking.openURL(pendingVibe.vibeUrl);
+                    } else if (pendingVibe.vibeId) {
+                      navigation.navigate('ClaimVibe', {vibeId: pendingVibe.vibeId});
                     }
                   }}
                   activeOpacity={0.8}>
