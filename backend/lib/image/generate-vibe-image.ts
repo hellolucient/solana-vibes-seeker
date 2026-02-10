@@ -1,7 +1,7 @@
 /**
  * Generate vibe static image: base PNG + text overlays.
  * Uses satori + resvg-js for reliable text rendering on Vercel.
- * Base asset: public/media/vibes4b.png
+ * Base asset: public/media/vibes-base.png
  * 
  * Text elements rendered on the image:
  * - Top-left: @handle (subtle semi-transparent gray)
@@ -21,7 +21,7 @@ import sharp from "sharp";
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
 
-const BASE_IMAGE_PATH = path.join(process.cwd(), "public", "media", "vibes4b.png");
+const BASE_IMAGE_PATH = path.join(process.cwd(), "public", "media", "vibes-base.png");
 const FONT_PATH = path.join(process.cwd(), "lib", "fonts", "JetBrainsMono-Regular.ttf");
 const HANDLE_FONT_PATH = path.join(process.cwd(), "lib", "fonts", "Montserrat-Black.ttf");
 
