@@ -22,7 +22,7 @@ function isXAuthCallback(url: string): boolean {
 export const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
     'solanavibes://',
-    'https://solana-vibes.vercel.app',
+    'https://solana-vibes-seeker.vercel.app',
   ],
   config: {
     screens: {
@@ -67,7 +67,7 @@ export function parseClaimUrl(url: string): string | null {
     return customMatch[1];
   }
 
-  // Handle web URL: https://solana-vibes.vercel.app/v/{vibeId}
+  // Handle web URL: https://solana-vibes-seeker.vercel.app/v/{vibeId}
   const webMatch = url.match(/\/v\/([^/?]+)/);
   if (webMatch) {
     return webMatch[1];

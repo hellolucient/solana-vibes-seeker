@@ -22,7 +22,7 @@ import {useMobileWallet} from '../hooks/useMobileWallet';
 import {useVibeApi} from '../hooks/useVibeApi';
 import {VibeSpinner} from '../components/VibeSpinner';
 
-const X_AUTH_BASE = 'https://solana-vibes.vercel.app/api/auth/x';
+const X_AUTH_BASE = 'https://solana-vibes-seeker.vercel.app/api/auth/x';
 const X_AUTH_RETURN = 'solanavibes://auth/x';
 const X_USERNAME_STORAGE_KEY = '@solanavibes/x_username';
 

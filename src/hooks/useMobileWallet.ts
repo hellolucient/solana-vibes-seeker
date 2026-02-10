@@ -38,7 +38,7 @@ function toUint8Array(base64: string): Uint8Array {
 // App identity for MWA authorization
 const APP_IDENTITY = {
   name: 'Solana Vibes',
-  uri: 'https://solana-vibes.vercel.app',
+  uri: 'https://solana-vibes-seeker.vercel.app',
   icon: 'favicon.ico',
 };
 

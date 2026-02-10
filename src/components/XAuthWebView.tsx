@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import {WebView, WebViewNavigation} from 'react-native-webview';
 
-const BASE_URL = 'https://solana-vibes.vercel.app';
+const BASE_URL = 'https://solana-vibes-seeker.vercel.app';
 const AUTH_URL = `${BASE_URL}/api/auth/x`;
 const ME_URL = `${BASE_URL}/api/auth/x/me`;
 

@@ -74,7 +74,7 @@ export function ProfileScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() =>
-              Linking.openURL('https://solana-vibes.vercel.app/guide')
+              Linking.openURL('https://solana-vibes-seeker.vercel.app/guide')
             }>
             <Text style={styles.menuItemIcon}>📖</Text>
             <Text style={styles.menuItemText}>How It Works</Text>

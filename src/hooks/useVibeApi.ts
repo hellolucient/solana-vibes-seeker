@@ -7,7 +7,7 @@ import {
 
 // Use your deployed backend
 const API_BASE_URL =
-  process.env.API_BASE_URL || 'https://solana-vibes.vercel.app';
+  process.env.API_BASE_URL || 'https://solana-vibes-seeker.vercel.app';
 
 /**
  * Deserialize a transaction from a base64 string.
