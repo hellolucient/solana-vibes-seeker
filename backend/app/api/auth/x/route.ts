@@ -48,8 +48,10 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("[OAuth1] Failed to start auth:", error);
     const message = error instanceof Error ? error.message : "unknown_error";
-    return NextResponse.redirect(
-      new URL(`/?error=x_oauth&message=${encodeURIComponent(message)}`, req.url)
+    // Return JSON error (no web pages to redirect to in API-only backend)
+    return NextResponse.json(
+      { error: "x_oauth", message },
+      { status: 500 }
     );
   }
 }
