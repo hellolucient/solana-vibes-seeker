@@ -23,8 +23,8 @@ export async function GET(
   try {
     const vibe = await vibeStore.getById(id);
     if (vibe) {
-      const recipient = vibe.recipientXUsername
-        ? `@${vibe.recipientXUsername}`
+      const recipient = vibe.targetUsername
+        ? `@${vibe.targetUsername}`
         : "someone special";
       vibeInfo = `<p class="vibe-info">A vibe was sent to <strong>${recipient}</strong></p>`;
     }
