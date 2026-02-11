@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.solanavibesseeker",
+      "sha256_cert_fingerprints": [
+        "5A327CAEAE9698A184B55709947D84FA72A1711D8B3DA5A1D3F0620C0614D5C4",
+        "F3D48FE11E1851CCF51EDAEB163D5E3CC2E1BB2C985F46FC10C5DAB1A87FC0EA"
+      ]
+    }
+  }
+]

@@ -23,6 +23,7 @@ The token is signed with `X_AUTH_TOKEN_SECRET` or, if unset, `X_CONSUMER_SECRET`
 ## Troubleshooting
 
 - **Links opened from X** load in X's in-app browser, which has its own isolated cookie storage (does not share with Safari or the X app). So when you tap "Connect X", the OAuth screen does *not* show you as already logged in—you must sign in again in that browser. **Safari** shares cookies with the system, so if you're logged into X in Safari, the OAuth screen will show you as logged in. For the best experience, open the claim link in Safari.
+- **App Links / Universal Links**: We prefer links to open in the app (if installed) or the system browser (if not). See `CLAIM_URL_OPEN_IN_BROWSER.md` for how this is set up. On Android, App Links will open Chrome when the app isn't installed, which avoids X's in-app browser.
 - **Twitter callback URL** must exactly match: `https://solana-vibes-seeker.vercel.app/api/auth/x/callback` (or your production URL) in the Twitter Developer Portal.
 
 ## Phantom wallet on mobile Safari
