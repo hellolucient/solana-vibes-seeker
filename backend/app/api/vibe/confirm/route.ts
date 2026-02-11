@@ -68,9 +68,11 @@ export async function POST(req: NextRequest) {
 
     console.log("[vibe/confirm] Submitting transaction...");
 
+    // skipPreflight: true — simulation can fail spuriously ("signature verification") when the tx
+    // would succeed; we still detect failures via confirmation polling
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
-      { skipPreflight: false }
+      { skipPreflight: true, maxRetries: 3 }
     );
 
     console.log(`[vibe/confirm] Transaction sent: ${signature}`);

@@ -29,3 +29,7 @@ The token is signed with `X_AUTH_TOKEN_SECRET` or, if unset, `X_CONSUMER_SECRET`
 ## Phantom wallet on mobile Safari
 
 When connecting Phantom from Safari on iOS, the redirect back from Phantom can leave the wallet "not connected" on our page. Use **Open in Phantom** instead: it opens the claim page inside Phantom's in-app browser, where the wallet is natively available and connects reliably.
+
+## Wallet-first flow when opened from X on iOS
+
+When the claim link is opened in X's in-app browser on iOS, we show only **Connect wallet** on the initial screen. Tapping it opens the claim page in Phantom's browser, where both wallet and X tend to work reliably (Phantom shares session/cookies better). Once in Phantom, the full claim flow (Connect X if needed, then claim) is shown.

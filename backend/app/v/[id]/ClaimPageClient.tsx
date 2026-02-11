@@ -327,7 +327,16 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
             <a href={deepLink} style={styles.openInApp}>
               → open in app
             </a>
-            <p style={styles.divider}>or claim in browser</p>
+            <p style={styles.divider}>
+              {usePhantomBrowseFlow && !hasWallet ? "connect wallet to continue" : "or claim in browser"}
+            </p>
+
+            {/* On iOS (X's browser): wallet-first — only show Connect wallet; it opens Phantom where X + wallet work. In Phantom/desktop: full flow. */}
+            {usePhantomBrowseFlow && !hasWallet ? (
+              <p style={styles.walletFirstHint}>
+                Open in your wallet to claim. You&apos;ll connect X there if needed.
+              </p>
+            ) : null}
 
             {/* Connect Wallet — on mobile Safari opens in Phantom; else shows modal. Tap when connected → disconnect confirm. */}
             <button
@@ -355,55 +364,58 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
               )}
             </button>
 
-            {/* Connect X — same look as MainScreen */}
-            <button
-              type="button"
-              onClick={handleConnectX}
-              style={hasXAuth ? { ...styles.connectXBtn, ...styles.connectXBtnDone } : styles.connectXBtn}
-            >
-              <span style={hasXAuth ? { ...styles.xIcon, ...styles.xIconDone } : styles.xIcon}>𝕏</span>
-              {hasXAuth ? (
-                <>
-                  <span style={styles.connectXLabelDone}>
-                    {xUser?.username && xUser.username !== "..."
-                      ? `@${xUser.username}`
-                      : "Connected"}
-                  </span>
-                  <span style={styles.disconnectX}>Disconnect</span>
-                </>
-              ) : (
-                <span style={styles.connectXLabel}>Connect X</span>
-              )}
-            </button>
+            {/* Connect X + Claim — only show when NOT in wallet-first mode (i.e. in Phantom or desktop) */}
+            {!(usePhantomBrowseFlow && !hasWallet) && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleConnectX}
+                  style={hasXAuth ? { ...styles.connectXBtn, ...styles.connectXBtnDone } : styles.connectXBtn}
+                >
+                  <span style={hasXAuth ? { ...styles.xIcon, ...styles.xIconDone } : styles.xIcon}>𝕏</span>
+                  {hasXAuth ? (
+                    <>
+                      <span style={styles.connectXLabelDone}>
+                        {xUser?.username && xUser.username !== "..."
+                          ? `@${xUser.username}`
+                          : "Connected"}
+                      </span>
+                      <span style={styles.disconnectX}>Disconnect</span>
+                    </>
+                  ) : (
+                    <span style={styles.connectXLabel}>Connect X</span>
+                  )}
+                </button>
 
-            {/* Claim button */}
-            <button
-              onClick={handleClaim}
-              disabled={
-                !hasWallet ||
-                !hasXAuth ||
-                claimState === "preparing" ||
-                claimState === "signing" ||
-                claimState === "confirming"
-              }
-              style={
-                claimState === "preparing" ||
-                claimState === "signing" ||
-                claimState === "confirming"
-                  ? { ...styles.btnClaim, ...styles.btnClaimProcessing }
-                  : styles.btnClaim
-              }
-            >
-              {claimState === "preparing"
-                ? "Preparing..."
-                : claimState === "signing"
-                ? "Sign in wallet..."
-                : claimState === "confirming"
-                ? "Confirming..."
-                : "claim vibe"}
-            </button>
+                <button
+                  onClick={handleClaim}
+                  disabled={
+                    !hasWallet ||
+                    !hasXAuth ||
+                    claimState === "preparing" ||
+                    claimState === "signing" ||
+                    claimState === "confirming"
+                  }
+                  style={
+                    claimState === "preparing" ||
+                    claimState === "signing" ||
+                    claimState === "confirming"
+                      ? { ...styles.btnClaim, ...styles.btnClaimProcessing }
+                      : styles.btnClaim
+                  }
+                >
+                  {claimState === "preparing"
+                    ? "Preparing..."
+                    : claimState === "signing"
+                    ? "Sign in wallet..."
+                    : claimState === "confirming"
+                    ? "Confirming..."
+                    : "claim vibe"}
+                </button>
 
-            <p style={styles.feeText}>Claim fee: ~0.001 SOL</p>
+                <p style={styles.feeText}>Claim fee: ~0.001 SOL</p>
+              </>
+            )}
             {error && <p style={styles.errorText}>{error}</p>}
           </>
         )}
@@ -502,6 +514,12 @@ const styles: Record<string, React.CSSProperties> = {
     color: "rgba(255,255,255,0.25)",
     fontSize: 12,
     margin: "8px 0",
+    textAlign: "center",
+  },
+  walletFirstHint: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.5)",
+    marginBottom: 12,
     textAlign: "center",
   },
   // Connect wallet — match MainScreen connectBtn
