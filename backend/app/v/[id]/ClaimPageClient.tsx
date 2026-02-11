@@ -69,9 +69,19 @@ type ClaimState =
   | "success"
   | "error";
 
+/** Mobile Safari (iOS) often fails to connect wallet; Phantom browse works. In Phantom/Solflare in-app browser, modal works. */
+function usePhantomBrowse(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
+  const inWalletBrowser = /Phantom|Solflare/i.test(ua);
+  return isMobile && !inWalletBrowser;
+}
+
 function ClaimInner({ vibeId }: { vibeId: string }) {
-  const { publicKey, connected, connecting, signTransaction } = useWallet();
+  const { publicKey, connected, connecting, signTransaction, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
+  const usePhantomBrowseFlow = usePhantomBrowse();
 
   const [vibeDetails, setVibeDetails] = useState<VibeDetails | null>(null);
   const [xUser, setXUser] = useState<{ username: string } | null>(null);
@@ -142,17 +152,36 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
     load();
   }, [vibeId, xToken]);
 
-  const handleConnectX = useCallback(() => {
-    const returnTo = `/v/${vibeId}`;
-    window.location.href = `${API_BASE}/api/auth/x?return_to=${encodeURIComponent(returnTo)}`;
-  }, [vibeId]);
-
-  const handleConnectWallet = useCallback(() => {
-    setVisible(true);
-  }, [setVisible]);
-
   const hasXAuth = xUser !== null || xToken !== null;
   const hasWallet = connected && publicKey;
+
+  const handleConnectX = useCallback(() => {
+    if (hasXAuth) {
+      const msg = xUser?.username && xUser.username !== "..."
+        ? `Disconnect @${xUser.username}?`
+        : "Disconnect X?";
+      if (!window.confirm(msg)) return;
+      const returnTo = `/v/${vibeId}`;
+      window.location.href = `${API_BASE}/api/auth/x/logout?return_to=${encodeURIComponent(returnTo)}`;
+      return;
+    }
+    const returnTo = `/v/${vibeId}`;
+    window.location.href = `${API_BASE}/api/auth/x?return_to=${encodeURIComponent(returnTo)}`;
+  }, [vibeId, hasXAuth, xUser]);
+
+  const handleConnectWallet = useCallback(() => {
+    if (connecting) return;
+    if (hasWallet) {
+      if (!window.confirm("Disconnect wallet? You will need to reconnect to claim.")) return;
+      disconnect();
+      return;
+    }
+    if (usePhantomBrowseFlow && phantomBrowseUrl) {
+      window.location.href = phantomBrowseUrl;
+      return;
+    }
+    setVisible(true);
+  }, [connecting, hasWallet, disconnect, usePhantomBrowseFlow, phantomBrowseUrl, setVisible]);
 
   const handleClaim = useCallback(async () => {
     if (!publicKey || !vibeDetails || !hasXAuth) {
@@ -300,17 +329,7 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
             </a>
             <p style={styles.divider}>or claim in browser</p>
 
-            {/* Open in Phantom (mobile Safari workaround — hide once wallet connected) */}
-            {phantomBrowseUrl && !hasWallet && (
-              <a
-                href={phantomBrowseUrl}
-                style={styles.phantomBrowseBtn}
-              >
-                Open in Phantom
-              </a>
-            )}
-
-            {/* Connect Wallet — same look as MainScreen */}
+            {/* Connect Wallet — on mobile Safari opens in Phantom; else shows modal. Tap when connected → disconnect confirm. */}
             <button
               type="button"
               onClick={handleConnectWallet}
@@ -326,6 +345,7 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
                 <>
                   <span style={styles.walletDot} />
                   <span style={styles.connectBtnLabelDone}>{shortenedAddress}</span>
+                  <span style={styles.disconnectWallet}>Disconnect</span>
                 </>
               ) : (
                 <>
@@ -343,11 +363,14 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
             >
               <span style={hasXAuth ? { ...styles.xIcon, ...styles.xIconDone } : styles.xIcon}>𝕏</span>
               {hasXAuth ? (
-                <span style={styles.connectXLabelDone}>
-                  {xUser?.username && xUser.username !== "..."
-                    ? `@${xUser.username}`
-                    : "Connected"}
-                </span>
+                <>
+                  <span style={styles.connectXLabelDone}>
+                    {xUser?.username && xUser.username !== "..."
+                      ? `@${xUser.username}`
+                      : "Connected"}
+                  </span>
+                  <span style={styles.disconnectX}>Disconnect</span>
+                </>
               ) : (
                 <span style={styles.connectXLabel}>Connect X</span>
               )}
@@ -481,22 +504,6 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "8px 0",
     textAlign: "center",
   },
-  phantomBrowseBtn: {
-    display: "block",
-    width: "100%",
-    paddingTop: 12,
-    paddingBottom: 12,
-    marginBottom: 8,
-    borderRadius: 10,
-    border: "1px solid rgba(155,89,182,0.5)",
-    background: "rgba(155,89,182,0.15)",
-    color: "#fff",
-    fontFamily: "inherit",
-    fontSize: 14,
-    fontWeight: 500,
-    textAlign: "center",
-    textDecoration: "none",
-  },
   // Connect wallet — match MainScreen connectBtn
   connectBtn: {
     display: "flex",
@@ -527,6 +534,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   connectBtnLabelDone: {
     fontWeight: 500,
+    flex: 1,
+  },
+  disconnectWallet: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.3)",
+    marginLeft: "auto",
   },
   phantomIcon: {
     fontSize: 16,
@@ -585,6 +598,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   connectXLabelDone: {
     fontWeight: 500,
+    flex: 1,
+  },
+  disconnectX: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.3)",
+    marginLeft: "auto",
   },
   btnClaim: {
     width: "100%",
