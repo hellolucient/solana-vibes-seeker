@@ -25,6 +25,7 @@ Message: Transaction simulation failed: Transaction did not pass signature verif
 - **skipPreflight: true** on `sendRawTransaction` — bypasses the simulation step that was failing. The transaction is still validated on-chain; we detect failures via the confirmation polling loop.
 - **maxDuration: 90** — Vercel serverless timeout (default can be 15s) extended so confirmation polling can complete.
 - **90s polling** — Increased from 30s to 90s, with `searchTransactionHistory: true` for RPCs that index slowly.
+- **Priority fee** — Added `setComputeUnitPrice` (50k microlamports) and `setComputeUnitLimit` (200k CUs). Without a priority fee on mainnet, transactions get deprioritized and can sit for a long time; Phantom may also show "0 network fee" which can confuse users. The priority fee ensures the tx lands promptly.
 
 ## Network alignment
 

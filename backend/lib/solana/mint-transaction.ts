@@ -10,7 +10,7 @@
  */
 
 import { create } from "@metaplex-foundation/mpl-core";
-import { transferSol } from "@metaplex-foundation/mpl-toolbox";
+import { transferSol, setComputeUnitPrice, setComputeUnitLimit } from "@metaplex-foundation/mpl-toolbox";
 import {
   publicKey,
   transactionBuilder,
@@ -92,8 +92,14 @@ export async function buildMintTransaction({
     amount: lamports(mintFee),
   });
 
-  // Combine instructions into one transaction
+  // Priority fee so tx lands promptly on mainnet (avoids "0 network fee" / deprioritization)
+  const priorityFeeBuilder = setComputeUnitPrice(umi, { microLamports: 50_000 });
+  const computeLimitBuilder = setComputeUnitLimit(umi, { units: 200_000 });
+
+  // Combine: priority fee first, then mint + transfer (ComputeBudget must be first)
   const builder = transactionBuilder()
+    .add(priorityFeeBuilder)
+    .add(computeLimitBuilder)
     .add(createBuilder)
     .add(feeTransferBuilder);
 
