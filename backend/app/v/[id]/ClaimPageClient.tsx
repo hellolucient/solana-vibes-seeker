@@ -37,6 +37,16 @@ function serializeSignedTransaction(tx: Transaction | VersionedTransaction): str
   return btoa(binary);
 }
 
+function formatTimestamp(iso?: string): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toISOString().replace("T", " ").slice(0, 19) + " UTC";
+  } catch {
+    return "";
+  }
+}
+
 interface VibeDetails {
   id: string;
   targetUsername: string;
@@ -44,6 +54,7 @@ interface VibeDetails {
   maskedWallet: string;
   vibeNumber: number;
   imageUri?: string;
+  createdAt?: string;
   claimStatus: "pending" | "claimed";
   mintAddress?: string;
 }
@@ -63,13 +74,25 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
 
   const [vibeDetails, setVibeDetails] = useState<VibeDetails | null>(null);
   const [xUser, setXUser] = useState<{ username: string } | null>(null);
+  const [xToken, setXToken] = useState<string | null>(null);
   const [claimState, setClaimState] = useState<ClaimState>("loading");
   const [error, setError] = useState<string | null>(null);
 
   const deepLink = `solanavibes://claim/${vibeId}`;
   const githubUrl = "https://github.com/hellolucient/solana-vibes-seeker";
 
-  // Fetch vibe details and X user
+  // Check for x= token in URL (iOS Safari fallback)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("x");
+    if (t) {
+      setXToken(t);
+      setXUser({ username: "..." });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  // Fetch vibe details and X user (from cookie)
   useEffect(() => {
     async function load() {
       try {
@@ -87,7 +110,7 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
         const vibe = await vibeRes.json();
         setVibeDetails({ ...vibe, imageUrl: vibe.imageUri || vibe.imageUrl });
 
-        if (meRes.ok) {
+        if (!xToken && meRes.ok) {
           const me = await meRes.json();
           if (me.connected && me.username) {
             setXUser({ username: me.username });
@@ -105,15 +128,17 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
       }
     }
     load();
-  }, [vibeId]);
+  }, [vibeId, xToken]);
 
   const handleConnectX = useCallback(() => {
     const returnTo = `/v/${vibeId}`;
     window.location.href = `${API_BASE}/api/auth/x?return_to=${encodeURIComponent(returnTo)}`;
   }, [vibeId]);
 
+  const hasXAuth = xUser !== null || xToken !== null;
+
   const handleClaim = useCallback(async () => {
-    if (!publicKey || !vibeDetails || !xUser) {
+    if (!publicKey || !vibeDetails || !hasXAuth) {
       setError("Connect X and wallet first");
       return;
     }
@@ -121,15 +146,19 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
     setClaimState("preparing");
     setError(null);
 
+    const prepareBody: Record<string, string> = {
+      vibeId: vibeDetails.id,
+      claimerWallet: publicKey.toBase58(),
+    };
+    if (xToken) prepareBody.x = xToken;
+    if (xUser && !xToken) prepareBody.xUsername = xUser.username;
+
     try {
       const prepareRes = await fetch(`${API_BASE}/api/vibe/claim/prepare`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          vibeId: vibeDetails.id,
-          claimerWallet: publicKey.toBase58(),
-        }),
+        body: JSON.stringify(prepareBody),
       });
 
       if (!prepareRes.ok) {
@@ -171,181 +200,280 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
       setError(e instanceof Error ? e.message : "Claim failed");
       setClaimState("ready");
     }
-  }, [publicKey, vibeDetails, xUser, signTransaction]);
+  }, [publicKey, vibeDetails, hasXAuth, xUser, xToken, signTransaction]);
+
+  const imageUrl = vibeDetails?.imageUri || vibeDetails?.imageUrl;
 
   if (claimState === "loading" || claimState === "error") {
     return (
       <div style={styles.container}>
-        <h1 style={styles.h1}>solana_vibes</h1>
-        <p style={styles.tagline}>mint vibe · share vibe · claim vibe</p>
-        {error && <p style={styles.error}>{error}</p>}
+        <h1 style={styles.title}>solana_vibes</h1>
+        <div style={styles.centerContent}>
+          {error && <p style={styles.errorText}>{error}</p>}
+          <p style={styles.loadingText}>Loading vibe...</p>
+        </div>
       </div>
     );
   }
 
-  const recipient = vibeDetails?.targetUsername
-    ? `@${vibeDetails.targetUsername}`
-    : "someone special";
-
   return (
     <div style={styles.container}>
-      <h1 style={styles.h1}>solana_vibes</h1>
-      <p style={styles.tagline}>mint vibe · share vibe · claim vibe</p>
-      <p style={styles.vibeInfo}>
-        A vibe was sent to <strong style={styles.strong}>{recipient}</strong>
-      </p>
+      <div style={styles.scrollContent}>
+        <h1 style={styles.title}>solana_vibes</h1>
 
-      {/* App-centric: Open in app */}
-      <a href={deepLink} style={styles.openBtn}>
-        → open in app
-      </a>
+        {/* Vibe image */}
+        {imageUrl && (
+          <img
+            src={imageUrl}
+            alt="Vibe"
+            style={styles.nftImage}
+          />
+        )}
 
-      <p style={styles.divider}>or claim in browser</p>
-
-      {/* Web claim flow */}
-      {claimState === "success" ? (
-        <div style={styles.successBox}>
-          <p style={styles.successTitle}>✓ Claimed</p>
-          <p style={styles.successSub}>
-            {publicKey
-              ? `by ${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
-              : "Success"}
+        {/* Terminal-style info */}
+        <div style={styles.terminalInfo}>
+          <p style={styles.terminalLine}>
+            &gt; <span style={styles.terminalGreen}>received solana_vibes</span>
           </p>
-        </div>
-      ) : (
-        <>
-          {!xUser ? (
-            <button onClick={handleConnectX} style={styles.secondaryBtn}>
-              connect X
-            </button>
-          ) : (
-            <p style={styles.connected}>X: @{xUser.username}</p>
-          )}
-          {!publicKey ? (
-            <button onClick={() => setVisible(true)} style={styles.secondaryBtn}>
-              connect wallet
-            </button>
-          ) : (
-            <p style={styles.connected}>
-              Wallet: {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
+          <p style={styles.terminalLine}>
+            &gt; <span style={styles.terminalGreen}>
+              verified by wallet {vibeDetails?.maskedWallet}
+            </span>
+          </p>
+          {vibeDetails?.mintAddress && (
+            <p style={styles.terminalLine}>
+              &gt; <span style={styles.terminalGreen}>
+                mint {vibeDetails.mintAddress.slice(0, 4)}...
+                {vibeDetails.mintAddress.slice(-4)}
+              </span>
             </p>
           )}
-          {error && <p style={styles.error}>{error}</p>}
-          <button
-            onClick={handleClaim}
-            disabled={
-              !xUser ||
-              !publicKey ||
-              claimState === "preparing" ||
-              claimState === "signing" ||
-              claimState === "confirming"
-            }
-            style={styles.claimBtn}
-          >
-            {claimState === "preparing"
-              ? "Preparing..."
-              : claimState === "signing"
-              ? "Sign in wallet..."
-              : claimState === "confirming"
-              ? "Confirming..."
-              : "confirm claim"}
-          </button>
-          <p style={styles.feeText}>Claim fee: ~0.001 SOL</p>
-        </>
-      )}
+          {vibeDetails?.createdAt && (
+            <p style={styles.terminalLine}>
+              {formatTimestamp(vibeDetails.createdAt)}
+            </p>
+          )}
+          <p style={styles.terminalLine}>
+            &gt; <span style={styles.terminalGreen}>
+              for @{vibeDetails?.targetUsername}
+            </span>
+          </p>
+        </div>
 
-      <p style={styles.divider}>don&apos;t have the app?</p>
-      <a href={`${githubUrl}/releases`} style={styles.getApp}>
-        get solana_vibes for android
-      </a>
-      <p style={styles.footer}>built for solana mobile</p>
+        {/* Claimed state */}
+        {claimState === "success" ? (
+          <div style={styles.claimedSection}>
+            <div style={styles.claimedBadge}>
+              <p style={styles.claimedBadgeTitle}>✓ Claimed</p>
+              <p style={styles.claimedBadgeSub}>
+                by {publicKey
+                  ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
+                  : "you"}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p style={styles.vibeForText}>
+              This vibe is for{" "}
+              <span style={styles.vibeForUsername}>
+                @{vibeDetails?.targetUsername}
+              </span>
+            </p>
+
+            {/* Open in app */}
+            <a href={deepLink} style={styles.openInApp}>
+              → open in app
+            </a>
+            <p style={styles.divider}>or claim in browser</p>
+
+            {!hasXAuth ? (
+              <button onClick={handleConnectX} style={styles.btnClaim}>
+                connect X
+              </button>
+            ) : !publicKey ? (
+              <button onClick={() => setVisible(true)} style={styles.btnClaim}>
+                connect wallet
+              </button>
+            ) : (
+              <button
+                onClick={handleClaim}
+                disabled={
+                  claimState === "preparing" ||
+                  claimState === "signing" ||
+                  claimState === "confirming"
+                }
+                style={styles.btnClaim}
+              >
+                {claimState === "preparing"
+                  ? "Preparing..."
+                  : claimState === "signing"
+                  ? "Sign in wallet..."
+                  : claimState === "confirming"
+                  ? "Confirming..."
+                  : "claim vibe"}
+              </button>
+            )}
+
+            <p style={styles.feeText}>Claim fee: ~0.001 SOL</p>
+            {error && <p style={styles.errorText}>{error}</p>}
+          </>
+        )}
+
+        <p style={styles.divider}>don&apos;t have the app?</p>
+        <a href={`${githubUrl}/releases`} style={styles.getApp}>
+          get solana_vibes for android
+        </a>
+        <p style={styles.footer}>built for solana mobile</p>
+      </div>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    fontFamily: "'JetBrains Mono', monospace",
+    fontFamily: "'JetBrains Mono', 'Menlo', monospace",
     background: "#050505",
     color: "#fff",
     minHeight: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
+    padding: 16,
+  },
+  scrollContent: {
+    maxWidth: 400,
+    margin: "0 auto",
+    paddingBottom: 40,
+  },
+  centerContent: {
+    textAlign: "center",
     padding: 24,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 300,
+    letterSpacing: 1.5,
+    color: "rgba(255,255,255,0.85)",
+    textAlign: "center",
+    paddingVertical: 12,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  nftImage: {
+    width: "100%",
+    height: 250,
+    borderRadius: 8,
+    backgroundColor: "#0a0a0a",
+    marginBottom: 20,
+    objectFit: "cover",
+  },
+  terminalInfo: {
+    width: "100%",
+    marginBottom: 20,
+  },
+  terminalLine: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.4)",
+    lineHeight: 24,
+    margin: 0,
+  },
+  terminalGreen: {
+    color: "#14F195",
+  },
+  vibeForText: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  vibeForUsername: {
+    color: "#14F195",
+    fontWeight: 600,
+  },
+  openInApp: {
+    display: "block",
+    textAlign: "center",
+    padding: "10px 20px",
+    marginBottom: 8,
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+    textDecoration: "none",
+  },
+  divider: {
+    color: "rgba(255,255,255,0.25)",
+    fontSize: 12,
+    margin: "16px 0",
     textAlign: "center",
   },
-  h1: { fontSize: 28, fontWeight: 400, marginBottom: 12 },
-  tagline: { fontSize: 13, color: "#00ff00", marginBottom: 32 },
-  vibeInfo: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.6)",
-    marginBottom: 28,
-    padding: "14px 18px",
-    background: "rgba(20,241,149,0.06)",
-    border: "1px solid rgba(20,241,149,0.12)",
-    borderRadius: 8,
-  },
-  strong: { color: "#14F195" },
-  openBtn: {
-    display: "inline-block",
-    padding: "10px 28px",
-    background: "transparent",
-    color: "#14F195",
-    fontSize: 14,
+  btnClaim: {
+    width: "100%",
+    padding: "18px 24px",
+    borderRadius: 12,
+    border: "1px solid rgba(159,106,255,0.4)",
+    background: "linear-gradient(180deg, rgba(159,106,255,0.12) 0%, rgba(20,241,149,0.06) 100%)",
+    color: "#fff",
+    fontFamily: "inherit",
+    fontSize: 16,
     fontWeight: 500,
-    border: "1px solid rgba(20,241,149,0.3)",
-    borderRadius: 6,
-    textDecoration: "none",
-    marginBottom: 16,
-  },
-  divider: { color: "rgba(255,255,255,0.25)", fontSize: 12, margin: "20px 0" },
-  secondaryBtn: {
-    padding: "10px 24px",
-    background: "transparent",
-    border: "1px solid #333",
-    color: "rgba(255,255,255,0.8)",
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 14,
-    borderRadius: 6,
     cursor: "pointer",
-    margin: "8px 0",
+    boxShadow: "0 0 20px rgba(159,106,255,0.15)",
   },
-  connected: { fontSize: 12, color: "rgba(255,255,255,0.6)", margin: "4px 0" },
-  claimBtn: {
-    padding: "12px 32px",
-    background: "rgba(20,241,149,0.15)",
-    border: "1px solid #14F195",
+  feeText: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.25)",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  claimedSection: {
+    width: "100%",
+    marginTop: 8,
+  },
+  claimedBadge: {
+    width: "100%",
+    backgroundColor: "rgba(20,241,149,0.08)",
+    border: "1px solid rgba(20,241,149,0.25)",
+    borderRadius: 12,
+    padding: "16px 20px",
+    textAlign: "center",
+  },
+  claimedBadgeTitle: {
+    fontSize: 18,
+    fontWeight: 600,
     color: "#14F195",
-    fontFamily: "'JetBrains Mono', monospace",
+    margin: 0,
+  },
+  claimedBadgeSub: {
     fontSize: 14,
-    fontWeight: 500,
-    borderRadius: 6,
-    cursor: "pointer",
+    color: "rgba(255,255,255,0.4)",
+    marginTop: 4,
+    margin: 0,
+  },
+  errorText: {
+    color: "#ff6b6b",
+    fontSize: 14,
+    textAlign: "center",
     marginTop: 12,
   },
-  feeText: { fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 8 },
-  successBox: {
-    padding: 20,
-    background: "rgba(20,241,149,0.1)",
-    border: "1px solid rgba(20,241,149,0.3)",
-    borderRadius: 8,
-    marginBottom: 16,
+  loadingText: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 16,
   },
-  successTitle: { color: "#14F195", fontSize: 18, fontWeight: 500 },
-  successSub: { fontSize: 12, color: "rgba(255,255,255,0.6)" },
-  error: { color: "#ff6b6b", fontSize: 13, margin: "8px 0" },
   getApp: {
+    display: "block",
+    textAlign: "center",
     padding: "10px 24px",
     border: "1px solid #333",
     color: "rgba(255,255,255,0.5)",
     fontSize: 12,
     borderRadius: 6,
     textDecoration: "none",
-    margin: "8px 0",
+    margin: "8px auto",
+    maxWidth: 200,
   },
-  footer: { marginTop: 40, fontSize: 11, color: "rgba(255,255,255,0.2)" },
+  footer: {
+    marginTop: 40,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.2)",
+    textAlign: "center",
+  },
 };
 
 const wallets = [new PhantomWalletAdapter()];

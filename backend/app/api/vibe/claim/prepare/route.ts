@@ -16,12 +16,13 @@ import { isVibeInVault } from "@/lib/solana/mint";
 import { buildClaimTransaction } from "@/lib/solana/claim-transaction";
 import { getClaimFeeLamports } from "@/lib/solana/config";
 import { X_USER_COOKIE } from "@/lib/x-oauth-1";
+import { verifyXAuthToken } from "@/lib/x-auth-token";
 
 export async function POST(req: NextRequest) {
   console.log("[vibe/claim/prepare] Request start");
 
   // Parse request body
-  let body: { vibeId: string; claimerWallet: string; xUsername?: string };
+  let body: { vibeId: string; claimerWallet: string; xUsername?: string; x?: string };
   try {
     body = await req.json();
   } catch {
@@ -30,22 +31,22 @@ export async function POST(req: NextRequest) {
 
   const { vibeId, claimerWallet } = body;
 
-  // Get X username: prefer body param (mobile), fall back to cookie (web)
+  // Get X username: body.xUsername (mobile) > body.x (web signed token) > cookie (web)
   let xUser: { id: string; username: string } | null = null;
 
   if (body.xUsername) {
-    // Mobile app sends username directly
     xUser = { id: "", username: body.xUsername };
-  } else {
-    // Web app sends via cookie
+  } else if (body.x) {
+    const verified = verifyXAuthToken(body.x);
+    if (verified) xUser = { id: "", username: verified.username };
+  }
+  if (!xUser) {
     const cookieStore = await cookies();
     const userCookie = cookieStore.get(X_USER_COOKIE)?.value;
     if (userCookie) {
       try {
         const parsed = JSON.parse(userCookie);
-        if (parsed.username) {
-          xUser = { id: parsed.id, username: parsed.username };
-        }
+        if (parsed.username) xUser = { id: parsed.id, username: parsed.username };
       } catch (e) {
         console.error("[vibe/claim/prepare] Invalid X user cookie:", e);
       }

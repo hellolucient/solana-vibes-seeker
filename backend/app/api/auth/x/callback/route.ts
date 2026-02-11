@@ -11,6 +11,7 @@ import {
   X_OAUTH1_RETURN_COOKIE,
   X_USER_COOKIE,
 } from "@/lib/x-oauth-1";
+import { createXAuthToken } from "@/lib/x-auth-token";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -62,10 +63,14 @@ export async function GET(req: NextRequest) {
 
     // If redirecting to app deep link, append username so app doesn't need /me
     const isAppDeepLink = returnTo.startsWith("solanavibes://");
-    const redirectUrl =
-      isAppDeepLink && accessToken.screen_name
-        ? `${returnTo}${returnTo.includes("?") ? "&" : "?"}username=${encodeURIComponent(accessToken.screen_name)}`
-        : returnTo;
+    let redirectUrl = returnTo;
+    if (isAppDeepLink && accessToken.screen_name) {
+      redirectUrl = `${returnTo}${returnTo.includes("?") ? "&" : "?"}username=${encodeURIComponent(accessToken.screen_name)}`;
+    } else if (!isAppDeepLink && accessToken.screen_name) {
+      // Web: append signed token for iOS Safari (cookies may not persist)
+      const xToken = createXAuthToken(accessToken.screen_name);
+      redirectUrl = `${returnTo}${returnTo.includes("?") ? "&" : "?"}x=${encodeURIComponent(xToken)}`;
+    }
 
     const res = NextResponse.redirect(new URL(redirectUrl, req.url));
 
