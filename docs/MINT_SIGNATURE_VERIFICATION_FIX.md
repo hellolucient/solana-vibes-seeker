@@ -20,9 +20,11 @@ Message: Transaction simulation failed: Transaction did not pass signature verif
 
 3. **Wallet / signer mismatch** — The connected wallet must match the `senderWallet` passed to prepare. Rare if using the same session.
 
-## Fix applied
+## Fixes applied
 
 - **skipPreflight: true** on `sendRawTransaction` — bypasses the simulation step that was failing. The transaction is still validated on-chain; we detect failures via the confirmation polling loop.
+- **maxDuration: 90** — Vercel serverless timeout (default can be 15s) extended so confirmation polling can complete.
+- **90s polling** — Increased from 30s to 90s, with `searchTransactionHistory: true` for RPCs that index slowly.
 
 ## Network alignment
 
