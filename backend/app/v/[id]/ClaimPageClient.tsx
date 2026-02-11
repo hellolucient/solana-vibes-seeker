@@ -80,6 +80,13 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
 
   const deepLink = `solanavibes://claim/${vibeId}`;
   const githubUrl = "https://github.com/hellolucient/solana-vibes-seeker";
+  const claimPageUrl =
+    typeof window !== "undefined"
+      ? window.location.origin + window.location.pathname
+      : "";
+  const phantomBrowseUrl = claimPageUrl
+    ? `https://phantom.app/ul/browse/${encodeURIComponent(claimPageUrl)}?ref=${encodeURIComponent(claimPageUrl)}`
+    : "";
 
   const shortenedAddress = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
@@ -239,8 +246,8 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
           />
         )}
 
-        {/* Terminal-style info — compact, no gaps */}
-        <div style={styles.terminalInfo}>
+        {/* Terminal-style info — single block, tight spacing */}
+        <div style={styles.terminalBlock}>
           <div style={styles.terminalLine}>
             &gt; <span style={styles.terminalGreen}>received solana_vibes</span>
           </div>
@@ -291,6 +298,16 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
               → open in app
             </a>
             <p style={styles.divider}>or claim in browser</p>
+
+            {/* Open in Phantom (mobile Safari workaround — wallet connects reliably) */}
+            {phantomBrowseUrl && (
+              <a
+                href={phantomBrowseUrl}
+                style={styles.phantomBrowseBtn}
+              >
+                Open in Phantom
+              </a>
+            )}
 
             {/* Connect Wallet — same look as MainScreen */}
             <button
@@ -382,13 +399,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "'JetBrains Mono', 'Menlo', monospace",
     background: "#050505",
     color: "#fff",
-    minHeight: "100vh",
     padding: 16,
+    display: "block",
   },
   scrollContent: {
     maxWidth: 400,
     margin: "0 auto",
     paddingBottom: 32,
+    display: "block",
   },
   centerContent: {
     textAlign: "center",
@@ -414,17 +432,20 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 12,
     objectFit: "cover",
   },
-  terminalInfo: {
+  terminalBlock: {
     width: "100%",
-    marginBottom: 12,
+    marginBottom: 16,
     padding: 0,
+    display: "block",
   },
   terminalLine: {
     fontSize: 14,
     color: "rgba(255,255,255,0.4)",
-    lineHeight: 22,
+    lineHeight: 1.4,
     margin: 0,
     padding: 0,
+    display: "block",
+    minHeight: "unset",
   },
   terminalGreen: {
     color: "#14F195",
@@ -453,6 +474,22 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     margin: "8px 0",
     textAlign: "center",
+  },
+  phantomBrowseBtn: {
+    display: "block",
+    width: "100%",
+    paddingTop: 12,
+    paddingBottom: 12,
+    marginBottom: 8,
+    borderRadius: 10,
+    border: "1px solid rgba(155,89,182,0.5)",
+    background: "rgba(155,89,182,0.15)",
+    color: "#fff",
+    fontFamily: "inherit",
+    fontSize: 14,
+    fontWeight: 500,
+    textAlign: "center",
+    textDecoration: "none",
   },
   // Connect wallet — match MainScreen connectBtn
   connectBtn: {

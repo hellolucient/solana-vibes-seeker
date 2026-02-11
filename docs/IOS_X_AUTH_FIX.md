@@ -24,3 +24,7 @@ The token is signed with `X_AUTH_TOKEN_SECRET` or, if unset, `X_CONSUMER_SECRET`
 
 - **Links opened from X** load in X's in-app browser, which has its own isolated cookie storage (does not share with Safari or the X app). So when you tap "Connect X", the OAuth screen does *not* show you as already logged in—you must sign in again in that browser. **Safari** shares cookies with the system, so if you're logged into X in Safari, the OAuth screen will show you as logged in. For the best experience, open the claim link in Safari.
 - **Twitter callback URL** must exactly match: `https://solana-vibes-seeker.vercel.app/api/auth/x/callback` (or your production URL) in the Twitter Developer Portal.
+
+## Phantom wallet on mobile Safari
+
+When connecting Phantom from Safari on iOS, the redirect back from Phantom can leave the wallet "not connected" on our page. Use **Open in Phantom** instead: it opens the claim page inside Phantom's in-app browser, where the wallet is natively available and connects reliably.
