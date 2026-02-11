@@ -202,7 +202,7 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
     }
   }, [publicKey, vibeDetails, hasXAuth, xUser, xToken, signTransaction]);
 
-  const imageUrl = vibeDetails?.imageUri || vibeDetails?.imageUrl;
+  const imageUrl = vibeDetails?.imageUri;
 
   if (claimState === "loading" || claimState === "error") {
     return (
