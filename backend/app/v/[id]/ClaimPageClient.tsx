@@ -341,7 +341,7 @@ const styles: Record<string, React.CSSProperties> = {
   scrollContent: {
     maxWidth: 400,
     margin: "0 auto",
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
   centerContent: {
     textAlign: "center",
@@ -353,28 +353,30 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: 1.5,
     color: "rgba(255,255,255,0.85)",
     textAlign: "center",
-    paddingTop: 12,
-    paddingBottom: 12,
-    marginTop: 8,
-    marginBottom: 4,
+    paddingTop: 8,
+    paddingBottom: 8,
+    marginTop: 4,
+    marginBottom: 8,
   },
   nftImage: {
     width: "100%",
-    height: 250,
+    height: 220,
+    minHeight: 140,
     borderRadius: 8,
     backgroundColor: "#0a0a0a",
-    marginBottom: 20,
+    marginBottom: 12,
     objectFit: "cover",
   },
   terminalInfo: {
     width: "100%",
-    marginBottom: 20,
+    marginBottom: 12,
   },
   terminalLine: {
     fontSize: 14,
     color: "rgba(255,255,255,0.4)",
-    lineHeight: 24,
+    lineHeight: 20,
     margin: 0,
+    marginBottom: 2,
   },
   terminalGreen: {
     color: "#14F195",
@@ -383,7 +385,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 16,
     color: "rgba(255,255,255,0.6)",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 8,
   },
   vibeForUsername: {
     color: "#14F195",
@@ -392,8 +394,8 @@ const styles: Record<string, React.CSSProperties> = {
   openInApp: {
     display: "block",
     textAlign: "center",
-    padding: "10px 20px",
-    marginBottom: 8,
+    padding: "8px 16px",
+    marginBottom: 4,
     color: "rgba(255,255,255,0.6)",
     fontSize: 14,
     textDecoration: "none",
@@ -401,7 +403,7 @@ const styles: Record<string, React.CSSProperties> = {
   divider: {
     color: "rgba(255,255,255,0.25)",
     fontSize: 12,
-    margin: "16px 0",
+    margin: "8px 0",
     textAlign: "center",
   },
   btnClaim: {
@@ -420,7 +422,7 @@ const styles: Record<string, React.CSSProperties> = {
   feeText: {
     fontSize: 13,
     color: "rgba(255,255,255,0.25)",
-    marginTop: 12,
+    marginTop: 8,
     textAlign: "center",
   },
   claimedSection: {

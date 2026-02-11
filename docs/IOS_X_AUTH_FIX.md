@@ -19,3 +19,8 @@ On iOS Safari (and some other mobile browsers), cookies set during the OAuth red
 ## Env
 
 The token is signed with `X_AUTH_TOKEN_SECRET` or, if unset, `X_CONSUMER_SECRET`. No extra env var is required if `X_CONSUMER_SECRET` is already set.
+
+## Troubleshooting
+
+- **Links opened from X** may load in X's in-app browser. After OAuth, the redirect should land back in that same view. If sign-in still doesn't stick, try opening the claim link in Safari (outside X) and run the flow there.
+- **Twitter callback URL** must exactly match: `https://solana-vibes-seeker.vercel.app/api/auth/x/callback` (or your production URL) in the Twitter Developer Portal.

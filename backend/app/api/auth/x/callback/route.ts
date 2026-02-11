@@ -68,8 +68,13 @@ export async function GET(req: NextRequest) {
       redirectUrl = `${returnTo}${returnTo.includes("?") ? "&" : "?"}username=${encodeURIComponent(accessToken.screen_name)}`;
     } else if (!isAppDeepLink && accessToken.screen_name) {
       // Web: append signed token for iOS Safari (cookies may not persist)
-      const xToken = createXAuthToken(accessToken.screen_name);
-      redirectUrl = `${returnTo}${returnTo.includes("?") ? "&" : "?"}x=${encodeURIComponent(xToken)}`;
+      try {
+        const xToken = createXAuthToken(accessToken.screen_name);
+        redirectUrl = `${returnTo}${returnTo.includes("?") ? "&" : "?"}x=${encodeURIComponent(xToken)}`;
+      } catch (e) {
+        console.warn("[OAuth1] Could not create x token (missing X_CONSUMER_SECRET?):", e);
+        // Continue without token - cookie may still work on some browsers
+      }
     }
 
     const res = NextResponse.redirect(new URL(redirectUrl, req.url));
