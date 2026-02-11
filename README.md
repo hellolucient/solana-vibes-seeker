@@ -140,10 +140,10 @@ This app uses the existing [solana-vibes](https://github.com/hellolucient/solana
 
 ## Deep Linking
 
-The app supports deep links for claim URLs:
+The app supports deep links for claim URLs. Clicking a claim link opens the app if installed, or shows a web claim page where users can connect X and wallet to claim without the app:
 
 - **Custom scheme**: `solanavibes://claim/{vibeId}`
-- **Universal link**: `https://solana-vibes.vercel.app/v/{vibeId}`
+- **Universal link**: `https://solana-vibes-seeker.vercel.app/v/{vibeId}` (web claim or open in app)
 
 ## License
 
