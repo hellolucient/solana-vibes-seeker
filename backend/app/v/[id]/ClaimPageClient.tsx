@@ -297,7 +297,7 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
               type="button"
               onClick={handleConnectWallet}
               disabled={connecting}
-              style={[styles.connectBtn, hasWallet && styles.connectBtnDone]}
+              style={hasWallet ? { ...styles.connectBtn, ...styles.connectBtnDone } : styles.connectBtn}
             >
               {connecting ? (
                 <>
@@ -321,9 +321,9 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
             <button
               type="button"
               onClick={handleConnectX}
-              style={[styles.connectXBtn, hasXAuth && styles.connectXBtnDone]}
+              style={hasXAuth ? { ...styles.connectXBtn, ...styles.connectXBtnDone } : styles.connectXBtn}
             >
-              <span style={[styles.xIcon, hasXAuth && styles.xIconDone]}>𝕏</span>
+              <span style={hasXAuth ? { ...styles.xIcon, ...styles.xIconDone } : styles.xIcon}>𝕏</span>
               {hasXAuth ? (
                 <span style={styles.connectXLabelDone}>
                   {xUser?.username && xUser.username !== "..."
@@ -345,13 +345,13 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
                 claimState === "signing" ||
                 claimState === "confirming"
               }
-              style={[
-                styles.btnClaim,
-                (claimState === "preparing" ||
-                  claimState === "signing" ||
-                  claimState === "confirming") &&
-                  styles.btnClaimProcessing,
-              ]}
+              style={
+                claimState === "preparing" ||
+                claimState === "signing" ||
+                claimState === "confirming"
+                  ? { ...styles.btnClaim, ...styles.btnClaimProcessing }
+                  : styles.btnClaim
+              }
             >
               {claimState === "preparing"
                 ? "Preparing..."
