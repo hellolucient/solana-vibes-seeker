@@ -8,6 +8,7 @@ import {
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider, useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
+import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import {
   VersionedTransaction,
   Transaction,
@@ -299,8 +300,8 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
             </a>
             <p style={styles.divider}>or claim in browser</p>
 
-            {/* Open in Phantom (mobile Safari workaround — wallet connects reliably) */}
-            {phantomBrowseUrl && (
+            {/* Open in Phantom (mobile Safari workaround — hide once wallet connected) */}
+            {phantomBrowseUrl && !hasWallet && (
               <a
                 href={phantomBrowseUrl}
                 style={styles.phantomBrowseBtn}
@@ -401,12 +402,17 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#fff",
     padding: 16,
     display: "block",
+    boxSizing: "border-box",
   },
   scrollContent: {
     maxWidth: 400,
+    width: "100%",
     margin: "0 auto",
     paddingBottom: 32,
+    paddingLeft: 0,
+    paddingRight: 0,
     display: "block",
+    boxSizing: "border-box",
   },
   centerContent: {
     textAlign: "center",
@@ -606,15 +612,20 @@ const styles: Record<string, React.CSSProperties> = {
   },
   claimedSection: {
     width: "100%",
+    maxWidth: "100%",
     marginTop: 8,
+    boxSizing: "border-box",
   },
   claimedBadge: {
     width: "100%",
+    maxWidth: "100%",
+    boxSizing: "border-box",
     backgroundColor: "rgba(20,241,149,0.08)",
     border: "1px solid rgba(20,241,149,0.25)",
     borderRadius: 12,
     padding: "16px 20px",
     textAlign: "center",
+    overflow: "hidden",
   },
   claimedBadgeTitle: {
     fontSize: 18,
@@ -665,7 +676,10 @@ const spinnerStyle = `
 }
 `;
 
-const wallets = [new PhantomWalletAdapter()];
+const wallets = [
+  new PhantomWalletAdapter(),
+  new SolflareWalletAdapter(),
+];
 
 export function ClaimPageClient({ vibeId }: { vibeId: string }) {
   return (
