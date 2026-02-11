@@ -69,7 +69,7 @@ type ClaimState =
   | "error";
 
 function ClaimInner({ vibeId }: { vibeId: string }) {
-  const { publicKey, signTransaction } = useWallet();
+  const { publicKey, connected, connecting, signTransaction } = useWallet();
   const { setVisible } = useWalletModal();
 
   const [vibeDetails, setVibeDetails] = useState<VibeDetails | null>(null);
@@ -80,6 +80,10 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
 
   const deepLink = `solanavibes://claim/${vibeId}`;
   const githubUrl = "https://github.com/hellolucient/solana-vibes-seeker";
+
+  const shortenedAddress = publicKey
+    ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
+    : "";
 
   // Check for x= token in URL (iOS Safari fallback)
   useEffect(() => {
@@ -135,7 +139,12 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
     window.location.href = `${API_BASE}/api/auth/x?return_to=${encodeURIComponent(returnTo)}`;
   }, [vibeId]);
 
+  const handleConnectWallet = useCallback(() => {
+    setVisible(true);
+  }, [setVisible]);
+
   const hasXAuth = xUser !== null || xToken !== null;
+  const hasWallet = connected && publicKey;
 
   const handleClaim = useCallback(async () => {
     if (!publicKey || !vibeDetails || !hasXAuth) {
@@ -230,34 +239,32 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
           />
         )}
 
-        {/* Terminal-style info */}
+        {/* Terminal-style info — compact, no gaps */}
         <div style={styles.terminalInfo}>
-          <p style={styles.terminalLine}>
+          <div style={styles.terminalLine}>
             &gt; <span style={styles.terminalGreen}>received solana_vibes</span>
-          </p>
-          <p style={styles.terminalLine}>
+          </div>
+          <div style={styles.terminalLine}>
             &gt; <span style={styles.terminalGreen}>
               verified by wallet {vibeDetails?.maskedWallet}
             </span>
-          </p>
+          </div>
           {vibeDetails?.mintAddress && (
-            <p style={styles.terminalLine}>
+            <div style={styles.terminalLine}>
               &gt; <span style={styles.terminalGreen}>
                 mint {vibeDetails.mintAddress.slice(0, 4)}...
                 {vibeDetails.mintAddress.slice(-4)}
               </span>
-            </p>
+            </div>
           )}
           {vibeDetails?.createdAt && (
-            <p style={styles.terminalLine}>
-              {formatTimestamp(vibeDetails.createdAt)}
-            </p>
+            <div style={styles.terminalLine}>{formatTimestamp(vibeDetails.createdAt)}</div>
           )}
-          <p style={styles.terminalLine}>
+          <div style={styles.terminalLine}>
             &gt; <span style={styles.terminalGreen}>
               for @{vibeDetails?.targetUsername}
             </span>
-          </p>
+          </div>
         </div>
 
         {/* Claimed state */}
@@ -266,9 +273,7 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
             <div style={styles.claimedBadge}>
               <p style={styles.claimedBadgeTitle}>✓ Claimed</p>
               <p style={styles.claimedBadgeSub}>
-                by {publicKey
-                  ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
-                  : "you"}
+                by {shortenedAddress || "you"}
               </p>
             </div>
           </div>
@@ -287,33 +292,75 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
             </a>
             <p style={styles.divider}>or claim in browser</p>
 
-            {!hasXAuth ? (
-              <button onClick={handleConnectX} style={styles.btnClaim}>
-                connect X
-              </button>
-            ) : !publicKey ? (
-              <button onClick={() => setVisible(true)} style={styles.btnClaim}>
-                connect wallet
-              </button>
-            ) : (
-              <button
-                onClick={handleClaim}
-                disabled={
-                  claimState === "preparing" ||
+            {/* Connect Wallet — same look as MainScreen */}
+            <button
+              type="button"
+              onClick={handleConnectWallet}
+              disabled={connecting}
+              style={[styles.connectBtn, hasWallet && styles.connectBtnDone]}
+            >
+              {connecting ? (
+                <>
+                  <span style={styles.spinner} />
+                  <span style={styles.connectBtnLabel}>Connecting...</span>
+                </>
+              ) : hasWallet ? (
+                <>
+                  <span style={styles.walletDot} />
+                  <span style={styles.connectBtnLabelDone}>{shortenedAddress}</span>
+                </>
+              ) : (
+                <>
+                  <span style={styles.phantomIcon}>◉</span>
+                  <span style={styles.connectBtnLabel}>Connect wallet</span>
+                </>
+              )}
+            </button>
+
+            {/* Connect X — same look as MainScreen */}
+            <button
+              type="button"
+              onClick={handleConnectX}
+              style={[styles.connectXBtn, hasXAuth && styles.connectXBtnDone]}
+            >
+              <span style={[styles.xIcon, hasXAuth && styles.xIconDone]}>𝕏</span>
+              {hasXAuth ? (
+                <span style={styles.connectXLabelDone}>
+                  {xUser?.username && xUser.username !== "..."
+                    ? `@${xUser.username}`
+                    : "Connected"}
+                </span>
+              ) : (
+                <span style={styles.connectXLabel}>Connect X</span>
+              )}
+            </button>
+
+            {/* Claim button */}
+            <button
+              onClick={handleClaim}
+              disabled={
+                !hasWallet ||
+                !hasXAuth ||
+                claimState === "preparing" ||
+                claimState === "signing" ||
+                claimState === "confirming"
+              }
+              style={[
+                styles.btnClaim,
+                (claimState === "preparing" ||
                   claimState === "signing" ||
-                  claimState === "confirming"
-                }
-                style={styles.btnClaim}
-              >
-                {claimState === "preparing"
-                  ? "Preparing..."
-                  : claimState === "signing"
-                  ? "Sign in wallet..."
-                  : claimState === "confirming"
-                  ? "Confirming..."
-                  : "claim vibe"}
-              </button>
-            )}
+                  claimState === "confirming") &&
+                  styles.btnClaimProcessing,
+              ]}
+            >
+              {claimState === "preparing"
+                ? "Preparing..."
+                : claimState === "signing"
+                ? "Sign in wallet..."
+                : claimState === "confirming"
+                ? "Confirming..."
+                : "claim vibe"}
+            </button>
 
             <p style={styles.feeText}>Claim fee: ~0.001 SOL</p>
             {error && <p style={styles.errorText}>{error}</p>}
@@ -348,7 +395,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 24,
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 300,
     letterSpacing: 1.5,
     color: "rgba(255,255,255,0.85)",
@@ -370,13 +417,14 @@ const styles: Record<string, React.CSSProperties> = {
   terminalInfo: {
     width: "100%",
     marginBottom: 12,
+    padding: 0,
   },
   terminalLine: {
     fontSize: 14,
     color: "rgba(255,255,255,0.4)",
-    lineHeight: 20,
+    lineHeight: 22,
     margin: 0,
-    marginBottom: 2,
+    padding: 0,
   },
   terminalGreen: {
     color: "#14F195",
@@ -406,9 +454,99 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "8px 0",
     textAlign: "center",
   },
+  // Connect wallet — match MainScreen connectBtn
+  connectBtn: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingTop: 13,
+    paddingBottom: 13,
+    paddingLeft: 20,
+    paddingRight: 20,
+    borderRadius: 10,
+    border: "1px solid rgba(148,90,255,0.4)",
+    background: "rgba(148,90,255,0.08)",
+    marginBottom: 8,
+    width: "100%",
+    color: "#fff",
+    fontFamily: "inherit",
+    fontSize: 15,
+    cursor: "pointer",
+  },
+  connectBtnDone: {
+    borderColor: "rgba(20,241,149,0.3)",
+    background: "rgba(20,241,149,0.06)",
+  },
+  connectBtnLabel: {
+    fontWeight: 500,
+  },
+  connectBtnLabelDone: {
+    fontWeight: 500,
+  },
+  phantomIcon: {
+    fontSize: 16,
+    color: "#9F6AFF",
+  },
+  walletDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    background: "#9F6AFF",
+    flexShrink: 0,
+  },
+  spinner: {
+    display: "inline-block",
+    width: 16,
+    height: 16,
+    border: "2px solid rgba(255,255,255,0.3)",
+    borderTopColor: "#fff",
+    borderRadius: "50%",
+    animation: "claim-spin 0.8s linear infinite",
+  },
+  // Connect X — match MainScreen connectXBtn
+  connectXBtn: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingTop: 13,
+    paddingBottom: 13,
+    paddingLeft: 20,
+    paddingRight: 20,
+    borderRadius: 10,
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "transparent",
+    marginBottom: 10,
+    width: "100%",
+    color: "rgba(255,255,255,0.5)",
+    fontFamily: "inherit",
+    fontSize: 15,
+    cursor: "pointer",
+  },
+  connectXBtnDone: {
+    borderColor: "rgba(20,241,149,0.3)",
+    background: "rgba(20,241,149,0.06)",
+    color: "#fff",
+  },
+  xIcon: {
+    fontSize: 15,
+  },
+  xIconDone: {
+    color: "#fff",
+  },
+  connectXLabel: {
+    fontWeight: 500,
+  },
+  connectXLabelDone: {
+    fontWeight: 500,
+  },
   btnClaim: {
     width: "100%",
-    padding: "18px 24px",
+    paddingTop: 18,
+    paddingBottom: 18,
     borderRadius: 12,
     border: "1px solid rgba(159,106,255,0.4)",
     background: "linear-gradient(180deg, rgba(159,106,255,0.12) 0%, rgba(20,241,149,0.06) 100%)",
@@ -418,6 +556,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: "pointer",
     boxShadow: "0 0 20px rgba(159,106,255,0.15)",
+    marginTop: 4,
+  },
+  btnClaimProcessing: {
+    opacity: 0.7,
   },
   feeText: {
     fontSize: 13,
@@ -479,16 +621,26 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
+// Add keyframes for spinner
+const spinnerStyle = `
+@keyframes claim-spin {
+  to { transform: rotate(360deg); }
+}
+`;
+
 const wallets = [new PhantomWalletAdapter()];
 
 export function ClaimPageClient({ vibeId }: { vibeId: string }) {
   return (
-    <ConnectionProvider endpoint={RPC}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <ClaimInner vibeId={vibeId} />
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <>
+      <style>{spinnerStyle}</style>
+      <ConnectionProvider endpoint={RPC}>
+        <WalletProvider wallets={wallets} autoConnect>
+          <WalletModalProvider>
+            <ClaimInner vibeId={vibeId} />
+          </WalletModalProvider>
+        </WalletProvider>
+      </ConnectionProvider>
+    </>
   );
 }
