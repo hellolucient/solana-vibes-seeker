@@ -201,6 +201,15 @@ export function useMobileWallet() {
         throw new Error('Mobile Wallet Adapter not available');
       }
 
+      // Validate transaction before signing
+      if (!transaction) {
+        throw new Error('Transaction is null or undefined');
+      }
+      
+      if (!(transaction instanceof Transaction) && !(transaction instanceof VersionedTransaction)) {
+        throw new Error(`Invalid transaction type: ${typeof transaction}. Expected Transaction or VersionedTransaction`);
+      }
+
       let signedTx: T | null = null;
 
       await mwa.transact(async (wallet: any) => {
@@ -224,20 +233,56 @@ export function useMobileWallet() {
           });
         }
 
+        // Ensure transaction is properly formatted
+        // Some wallets (like Seeker) may be sensitive to transaction format
+        const txArray = Array.isArray(transaction) ? transaction : [transaction];
+        
         // Sign the transaction
         // The web3js MWA adapter accepts Transaction[] directly
-        let signedTxs: any[];
+        let signedTxs: any;
         try {
           // Try web3js wrapper format first (Transaction[])
           signedTxs = await wallet.signTransactions({
-            transactions: [transaction],
+            transactions: txArray,
           });
-        } catch {
+        } catch (err) {
+          console.warn('[MWA] Wrapper format failed, trying direct array:', err);
           // Fallback: some versions accept the array directly
-          signedTxs = await wallet.signTransactions([transaction]);
+          try {
+            signedTxs = await wallet.signTransactions(txArray);
+          } catch (err2) {
+            console.error('[MWA] Both signTransactions formats failed:', err2);
+            // Log more details for debugging
+            console.error('[MWA] Transaction type:', transaction.constructor.name);
+            console.error('[MWA] Transaction keys:', Object.keys(transaction));
+            if (transaction instanceof VersionedTransaction) {
+              console.error('[MWA] VersionedTransaction message:', transaction.message);
+            }
+            throw new Error(`Failed to sign transaction: ${err2 instanceof Error ? err2.message : 'Unknown error'}`);
+          }
         }
 
-        const result = signedTxs[0];
+        // Handle different return formats
+        if (!signedTxs) {
+          throw new Error('signTransactions returned undefined');
+        }
+
+        // Some wallets return an array directly, others return an object with a transactions property
+        let result: any;
+        if (Array.isArray(signedTxs)) {
+          result = signedTxs[0];
+        } else if (signedTxs.transactions && Array.isArray(signedTxs.transactions)) {
+          result = signedTxs.transactions[0];
+        } else if (signedTxs.transaction) {
+          result = signedTxs.transaction;
+        } else {
+          // Try to use it directly if it's already a transaction
+          result = signedTxs;
+        }
+
+        if (!result) {
+          throw new Error('No signed transaction found in response');
+        }
 
         // Handle the case where MWA returns raw bytes instead of Transaction objects
         if (result instanceof Uint8Array || ArrayBuffer.isView(result)) {
