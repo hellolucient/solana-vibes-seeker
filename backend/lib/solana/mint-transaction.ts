@@ -2,15 +2,15 @@
  * Build a mint transaction for sender-pays flow.
  * 
  * The transaction includes:
- * 1. Create NFT asset instruction (asset signer + authority sign)
+ * 1. Create NFT asset instruction (authority signs for collection)
  * 2. Micro-fee transfer to treasury (sender pays)
  * 
- * The asset signer and authority sign the transaction (asset creates account, authority owns it).
+ * The authority partially signs the transaction.
  * The sender will sign as fee payer when submitting.
  */
 
 import { create } from "@metaplex-foundation/mpl-core";
-import { transferSol, setComputeUnitPrice, setComputeUnitLimit } from "@metaplex-foundation/mpl-toolbox";
+import { transferSol } from "@metaplex-foundation/mpl-toolbox";
 import {
   publicKey,
   transactionBuilder,
@@ -94,14 +94,8 @@ export async function buildMintTransaction({
     amount: lamports(mintFee),
   });
 
-  // Priority fee so tx lands promptly on mainnet (avoids "0 network fee" / deprioritization)
-  const priorityFeeBuilder = setComputeUnitPrice(umi, { microLamports: 50_000 });
-  const computeLimitBuilder = setComputeUnitLimit(umi, { units: 200_000 });
-
-  // Combine: priority fee first, then mint + transfer (ComputeBudget must be first)
+  // Combine instructions into one transaction
   const builder = transactionBuilder()
-    .add(priorityFeeBuilder)
-    .add(computeLimitBuilder)
     .add(createBuilder)
     .add(feeTransferBuilder);
 
