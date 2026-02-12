@@ -138,6 +138,18 @@ This app uses the existing [solana-vibes](https://github.com/hellolucient/solana
 - Supabase database for vibe records
 - X OAuth verification
 
+## Wallets
+
+### Treasury Wallet
+**Address**: `Ba2SaKUUQxovZHhJadir27xmTHhQGdV4R8eQ78WqhmFy`
+
+This wallet receives micro-fees from mint and claim transactions.
+
+### Authority Wallet
+**Address**: `HBZMHT6YieybD52wEM8FH75fNv4ZdLHtBR82ebfmuAc7`
+
+This is the backend authority wallet that holds NFTs in the vault until they are claimed. It signs transfer transactions when vibes are claimed.
+
 ## Deep Linking
 
 The app supports deep links for claim URLs. Clicking a claim link opens the app if installed, or shows a web claim page where users can connect X and wallet to claim without the app:
