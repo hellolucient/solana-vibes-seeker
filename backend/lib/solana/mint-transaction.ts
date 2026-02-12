@@ -40,8 +40,9 @@ interface BuildMintTransactionResult {
 
 /**
  * Build a mint transaction where the sender pays.
- * The asset signer and authority sign for NFT creation (asset creates account, authority owns it).
+ * The asset signer signs for NFT creation (creates the account).
  * The sender will sign as fee payer on the frontend.
+ * Note: The owner parameter (authority.publicKey) doesn't require the authority to sign the CREATE instruction.
  */
 export async function buildMintTransaction({
   senderWallet,
@@ -114,10 +115,9 @@ export async function buildMintTransaction({
     .build(umi);
 
   // Asset signer needs to sign (creating a new account)
-  // Authority must also sign since the NFT is created with owner: authority.publicKey
+  // Authority doesn't need to sign the CREATE instruction - owner is just metadata
   // Sender will sign as fee payer on the frontend
-  let signedTransaction = await assetSigner.signTransaction(transaction);
-  signedTransaction = await authority.signTransaction(signedTransaction);
+  const signedTransaction = await assetSigner.signTransaction(transaction);
 
   // Convert to web3.js transaction and serialize
   const web3Transaction = toWeb3JsTransaction(signedTransaction);
