@@ -51,18 +51,33 @@ export async function POST(req: NextRequest) {
     // Check if this username has already been vibed
     const existingVibe = await getVibeByUsername(username);
     if (existingVibe) {
-      // If it's a pending vibe that's older than 10 minutes, clean it up
-      // This handles cases where user abandoned the flow or transaction timed out
+      // If it's a pending vibe, check if it was successfully minted
       if (existingVibe.claimStatus === "pending") {
+        // If it has metadataUri or imageUri, it was successfully minted - don't delete
+        // These are only set after successful mint confirmation
+        if (existingVibe.metadataUri || existingVibe.imageUri) {
+          console.log(`[vibe/prepare] Username @${username} already has successfully minted vibe by ${existingVibe.maskedWallet}`);
+          return NextResponse.json(
+            { 
+              error: "already_vibed",
+              message: `@${username} already vibed`,
+              senderWallet: existingVibe.maskedWallet,
+            },
+            { status: 409 }
+          );
+        }
+        
+        // If it's older than 10 minutes and has no metadata/image, it's an incomplete mint
+        // This handles cases where user abandoned the flow or transaction timed out
         const createdAt = new Date(existingVibe.createdAt);
         const ageMinutes = (Date.now() - createdAt.getTime()) / (1000 * 60);
         
         if (ageMinutes > 10) {
-          console.log(`[vibe/prepare] Cleaning up stale pending vibe for @${username} (${ageMinutes.toFixed(1)} minutes old)`);
+          console.log(`[vibe/prepare] Cleaning up stale incomplete mint for @${username} (${ageMinutes.toFixed(1)} minutes old, no metadata/image)`);
           await vibeStore.delete(existingVibe.id);
           // Continue to create new vibe
         } else {
-          console.log(`[vibe/prepare] Username @${username} already has pending vibe by ${existingVibe.maskedWallet} (${ageMinutes.toFixed(1)} minutes old)`);
+          console.log(`[vibe/prepare] Username @${username} already has pending mint by ${existingVibe.maskedWallet} (${ageMinutes.toFixed(1)} minutes old)`);
           return NextResponse.json(
             { 
               error: "already_vibed",
