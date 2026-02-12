@@ -73,59 +73,108 @@ export async function POST(req: NextRequest) {
 
     // skipPreflight: true — simulation can fail spuriously ("signature verification") when the tx
     // would succeed; we still detect failures via confirmation polling
-    const signature = await connection.sendRawTransaction(
-      transaction.serialize(),
-      { skipPreflight: true, maxRetries: 3 }
-    );
-
-    console.log(`[vibe/confirm] Transaction sent: ${signature}`);
+    let signature: string;
+    try {
+      signature = await connection.sendRawTransaction(
+        transaction.serialize(),
+        { skipPreflight: true, maxRetries: 3 }
+      );
+      console.log(`[vibe/confirm] Transaction sent: ${signature}`);
+    } catch (sendErr) {
+      console.error("[vibe/confirm] Failed to send transaction:", sendErr);
+      await vibeStore.delete(vibeId);
+      return NextResponse.json(
+        { 
+          error: `Failed to send transaction: ${sendErr instanceof Error ? sendErr.message : 'Unknown error'}`,
+        },
+        { status: 500 }
+      );
+    }
 
     // Step 3: Wait for confirmation using polling (WebSocket doesn't work on Vercel)
     let confirmed = false;
+    let finalStatus: any = null;
     const maxAttempts = 90; // 90s total (Vercel maxDuration allows this)
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const status = await connection.getSignatureStatus(signature, {
-        searchTransactionHistory: true, // Find tx even if RPC was slow to index
-      });
-      
-      if (status.value?.confirmationStatus === "confirmed" || 
-          status.value?.confirmationStatus === "finalized") {
-        if (status.value.err) {
+      try {
+        const status = await connection.getSignatureStatus(signature, {
+          searchTransactionHistory: true, // Find tx even if RPC was slow to index
+        });
+        
+        finalStatus = status.value;
+        
+        if (status.value?.confirmationStatus === "confirmed" || 
+            status.value?.confirmationStatus === "finalized") {
+          if (status.value.err) {
+            console.error("[vibe/confirm] Transaction failed:", status.value.err);
+            await vibeStore.delete(vibeId);
+            return NextResponse.json(
+              { 
+                error: "Transaction failed on-chain",
+                signature,
+                err: status.value.err,
+              },
+              { status: 500 }
+            );
+          }
+          confirmed = true;
+          break;
+        }
+        
+        // Transaction explicitly failed (e.g. blockhash expired)
+        if (status.value?.err) {
           console.error("[vibe/confirm] Transaction failed:", status.value.err);
           await vibeStore.delete(vibeId);
           return NextResponse.json(
-            { error: "Transaction failed on-chain" },
+            { 
+              error: "Transaction failed on-chain",
+              signature,
+              err: status.value.err,
+            },
             { status: 500 }
           );
         }
-        confirmed = true;
-        break;
-      }
-      
-      // Transaction explicitly failed (e.g. blockhash expired)
-      if (status.value?.err) {
-        console.error("[vibe/confirm] Transaction failed:", status.value.err);
-        await vibeStore.delete(vibeId);
-        return NextResponse.json(
-          { error: "Transaction failed on-chain" },
-          { status: 500 }
-        );
+      } catch (statusErr) {
+        console.warn(`[vibe/confirm] Error checking status (attempt ${attempt + 1}):`, statusErr);
+        // Continue polling even if one status check fails
       }
       
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
     
     if (!confirmed) {
-      await vibeStore.delete(vibeId);
-      const solscanBase = isMainnet() ? "https://solscan.io/tx" : "https://solscan.io/tx?cluster=devnet";
-      return NextResponse.json(
-        {
-          error: `Transaction confirmation timeout. Check status: ${solscanBase}/${signature}`,
-          signature,
-        },
-        { status: 500 }
-      );
+      // Before deleting, do a final check - transaction might have succeeded
+      // but RPC was slow to report it
+      try {
+        const finalCheck = await connection.getSignatureStatus(signature, {
+          searchTransactionHistory: true,
+        });
+        if (finalCheck.value && 
+            (finalCheck.value.confirmationStatus === "confirmed" || 
+             finalCheck.value.confirmationStatus === "finalized") &&
+            !finalCheck.value.err) {
+          console.log("[vibe/confirm] Transaction confirmed on final check");
+          confirmed = true;
+        }
+      } catch (finalErr) {
+        console.warn("[vibe/confirm] Final status check failed:", finalErr);
+      }
+      
+      if (!confirmed) {
+        const solscanBase = isMainnet() ? "https://solscan.io/tx" : "https://solscan.io/tx?cluster=devnet";
+        // Don't delete the vibe - user can check the transaction manually
+        // It might have succeeded but RPC was slow
+        console.warn(`[vibe/confirm] Confirmation timeout after ${maxAttempts}s. Signature: ${signature}`);
+        return NextResponse.json(
+          {
+            error: `Transaction confirmation timeout after ${maxAttempts}s. The transaction may still be processing. Check status: ${solscanBase}/${signature}`,
+            signature,
+            status: finalStatus,
+          },
+          { status: 504 }
+        );
+      }
     }
 
     console.log(`[vibe/confirm] Transaction confirmed: ${signature}`);
