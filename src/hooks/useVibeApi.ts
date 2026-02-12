@@ -3,6 +3,7 @@ import {
   Transaction,
   VersionedTransaction,
   VersionedMessage,
+  PublicKey,
 } from '@solana/web3.js';
 
 // Use your deployed backend
@@ -224,6 +225,19 @@ export function useVibeApi() {
 
       // Deserialize the transaction (handles both legacy and versioned)
       const transaction = deserializeTransaction(data.transaction);
+
+      // Ensure fee payer is set for wallets that need it (like Seeker)
+      // The fee payer should already be set from the backend, but some wallets
+      // need it explicitly set on the deserialized transaction
+      if (transaction instanceof Transaction) {
+        // For legacy Transaction, ensure fee payer is set if not already
+        if (!transaction.feePayer) {
+          // Fee payer should be set from backend, but if missing, use sender wallet
+          transaction.feePayer = new PublicKey(params.senderWallet);
+        }
+      }
+      // VersionedTransaction fee payer is in the message header and should be preserved
+      // We can't modify it after deserialization - it's read-only
 
       return {
         vibeId: data.vibeId,

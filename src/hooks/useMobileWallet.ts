@@ -237,6 +237,21 @@ export function useMobileWallet() {
         // Some wallets (like Seeker) may be sensitive to transaction format
         const txArray = Array.isArray(transaction) ? transaction : [transaction];
         
+        // Log transaction structure for debugging Seeker wallet issues
+        console.log('[MWA] Transaction type:', transaction.constructor.name);
+        if (transaction instanceof VersionedTransaction) {
+          console.log('[MWA] VersionedTransaction - message header:', transaction.message.header);
+          console.log('[MWA] VersionedTransaction - num required signatures:', transaction.message.header.numRequiredSignatures);
+          console.log('[MWA] VersionedTransaction - num readonly signed accounts:', transaction.message.header.numReadonlySignedAccounts);
+          console.log('[MWA] VersionedTransaction - num readonly unsigned accounts:', transaction.message.header.numReadonlyUnsignedAccounts);
+          console.log('[MWA] VersionedTransaction - account keys length:', transaction.message.staticAccountKeys?.length || 'undefined');
+          console.log('[MWA] VersionedTransaction - instructions length:', transaction.message.compiledInstructions?.length || 'undefined');
+        } else if (transaction instanceof Transaction) {
+          console.log('[MWA] Legacy Transaction - fee payer:', transaction.feePayer?.toBase58());
+          console.log('[MWA] Legacy Transaction - instructions length:', transaction.instructions?.length || 'undefined');
+          console.log('[MWA] Legacy Transaction - signatures length:', transaction.signatures?.length || 'undefined');
+        }
+        
         // Sign the transaction
         // The web3js MWA adapter accepts Transaction[] directly
         let signedTxs: any;
