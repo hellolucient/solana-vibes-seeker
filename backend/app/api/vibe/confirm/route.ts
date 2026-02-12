@@ -69,9 +69,29 @@ export async function POST(req: NextRequest) {
     const transactionBuffer = Buffer.from(signedTransaction, "base64");
     const transaction = VersionedTransaction.deserialize(transactionBuffer);
 
+    // Verify transaction has signatures
+    const signatures = transaction.signatures;
+    console.log(`[vibe/confirm] Transaction has ${signatures.length} signatures`);
+    if (signatures.length === 0) {
+      await vibeStore.delete(vibeId);
+      return NextResponse.json(
+        { error: "Transaction has no signatures" },
+        { status: 400 }
+      );
+    }
+
+    // Log signature details for debugging
+    signatures.forEach((sig, idx) => {
+      const sigStr = Buffer.from(sig).toString('base64');
+      const isEmpty = sig.every(b => b === 0);
+      console.log(`[vibe/confirm] Signature ${idx}: ${sigStr.slice(0, 16)}... (empty: ${isEmpty})`);
+    });
+
     console.log("[vibe/confirm] Submitting transaction...");
 
     // skipPreflight: false — use preflight simulation like the working web app
+    // If simulation fails with "signature verification", it might be a false positive
+    // but we should still try to send it
     let signature: string;
     try {
       signature = await connection.sendRawTransaction(
