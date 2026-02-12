@@ -86,9 +86,17 @@ export function useMobileWallet() {
 
       await mwa.transact(async (wallet: any) => {
         // Request authorization
+        // Note: Seeker wallet may default to the most recently used wallet
+        // If you need to select a different wallet, disconnect first and reconnect
         const authResult = await wallet.authorize({
           cluster: CLUSTER_MAP[cluster],
           identity: APP_IDENTITY,
+        });
+
+        // Log which wallet was selected for debugging
+        console.log('[MWA] Authorization result:', {
+          accounts: authResult.accounts?.length || 0,
+          walletUri: authResult.wallet_uri_base,
         });
 
         // The MWA protocol returns the address as base64-encoded bytes
@@ -107,6 +115,10 @@ export function useMobileWallet() {
           // Final fallback: treat as base58 string directly
           walletPublicKey = new PublicKey(addressRaw);
         }
+
+        // Log which wallet was selected for debugging
+        console.log('[MWA] Connected wallet:', walletPublicKey.toBase58());
+        console.log('[MWA] Wallet URI:', authResult.wallet_uri_base);
 
         // Store connection state
         setConnected(
