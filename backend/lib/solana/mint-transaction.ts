@@ -2,10 +2,10 @@
  * Build a mint transaction for sender-pays flow.
  * 
  * The transaction includes:
- * 1. Create NFT asset instruction (authority signs for collection)
+ * 1. Create NFT asset instruction (asset signer + authority sign)
  * 2. Micro-fee transfer to treasury (sender pays)
  * 
- * The authority partially signs the transaction.
+ * The asset signer and authority sign the transaction (asset creates account, authority owns it).
  * The sender will sign as fee payer when submitting.
  */
 
@@ -40,7 +40,8 @@ interface BuildMintTransactionResult {
 
 /**
  * Build a mint transaction where the sender pays.
- * The authority signs for NFT creation, sender signs as fee payer.
+ * The asset signer and authority sign for NFT creation (asset creates account, authority owns it).
+ * The sender will sign as fee payer on the frontend.
  */
 export async function buildMintTransaction({
   senderWallet,
@@ -113,9 +114,10 @@ export async function buildMintTransaction({
     .build(umi);
 
   // Asset signer needs to sign (creating a new account)
-  // Authority doesn't need to sign since sender pays for everything
+  // Authority must also sign since the NFT is created with owner: authority.publicKey
   // Sender will sign as fee payer on the frontend
-  const signedTransaction = await assetSigner.signTransaction(transaction);
+  let signedTransaction = await assetSigner.signTransaction(transaction);
+  signedTransaction = await authority.signTransaction(signedTransaction);
 
   // Convert to web3.js transaction and serialize
   const web3Transaction = toWeb3JsTransaction(signedTransaction);
