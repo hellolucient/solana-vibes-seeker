@@ -323,6 +323,30 @@ export function useMobileWallet() {
         } else {
           signedTx = result as T;
         }
+
+        // Verify the signed transaction's fee payer matches the connected wallet
+        // This prevents issues where a different wallet is selected in Seeker's UI
+        // The fee payer is the first account in VersionedTransaction
+        if (signedTx instanceof VersionedTransaction) {
+          const feePayer = signedTx.message.staticAccountKeys[0];
+          if (feePayer && !feePayer.equals(publicKey)) {
+            const errorMsg = 
+              `Wallet mismatch: Transaction was signed by ${feePayer.toBase58()} ` +
+              `but app is connected to ${publicKey.toBase58()}. ` +
+              `Please disconnect and reconnect with the correct wallet, or select the same wallet in Seeker's UI.`;
+            console.error('[MWA]', errorMsg);
+            throw new Error(errorMsg);
+          }
+        } else if (signedTx instanceof Transaction) {
+          if (signedTx.feePayer && !signedTx.feePayer.equals(publicKey)) {
+            const errorMsg = 
+              `Wallet mismatch: Transaction was signed by ${signedTx.feePayer.toBase58()} ` +
+              `but app is connected to ${publicKey.toBase58()}. ` +
+              `Please disconnect and reconnect with the correct wallet, or select the same wallet in Seeker's UI.`;
+            console.error('[MWA]', errorMsg);
+            throw new Error(errorMsg);
+          }
+        }
       });
 
       if (!signedTx) {
