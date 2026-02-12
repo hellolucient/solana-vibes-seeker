@@ -51,15 +51,39 @@ export async function POST(req: NextRequest) {
     // Check if this username has already been vibed
     const existingVibe = await getVibeByUsername(username);
     if (existingVibe) {
-      console.log(`[vibe/prepare] Username @${username} already vibed by ${existingVibe.maskedWallet}`);
-      return NextResponse.json(
-        { 
-          error: "already_vibed",
-          message: `@${username} already vibed`,
-          senderWallet: existingVibe.maskedWallet,
-        },
-        { status: 409 }
-      );
+      // If it's a pending vibe that's older than 10 minutes, clean it up
+      // This handles cases where user abandoned the flow or transaction timed out
+      if (existingVibe.claimStatus === "pending") {
+        const createdAt = new Date(existingVibe.createdAt);
+        const ageMinutes = (Date.now() - createdAt.getTime()) / (1000 * 60);
+        
+        if (ageMinutes > 10) {
+          console.log(`[vibe/prepare] Cleaning up stale pending vibe for @${username} (${ageMinutes.toFixed(1)} minutes old)`);
+          await vibeStore.delete(existingVibe.id);
+          // Continue to create new vibe
+        } else {
+          console.log(`[vibe/prepare] Username @${username} already has pending vibe by ${existingVibe.maskedWallet} (${ageMinutes.toFixed(1)} minutes old)`);
+          return NextResponse.json(
+            { 
+              error: "already_vibed",
+              message: `@${username} already vibed`,
+              senderWallet: existingVibe.maskedWallet,
+            },
+            { status: 409 }
+          );
+        }
+      } else {
+        // Already claimed - can't mint again
+        console.log(`[vibe/prepare] Username @${username} already vibed by ${existingVibe.maskedWallet}`);
+        return NextResponse.json(
+          { 
+            error: "already_vibed",
+            message: `@${username} already vibed`,
+            senderWallet: existingVibe.maskedWallet,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Get next vibe number
