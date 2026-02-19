@@ -232,8 +232,12 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 16,
   },
   disconnectLink: {
-    color: "rgba(255,255,255,0.5)",
+    color: "rgba(148,90,255,0.95)",
     textDecoration: "none",
+    marginLeft: 8,
+    padding: "4px 10px",
+    border: "1px solid rgba(148,90,255,0.5)",
+    borderRadius: 6,
   },
   noVibe: {
     fontSize: 20,

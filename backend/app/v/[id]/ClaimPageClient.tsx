@@ -481,6 +481,7 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: "#0a0a0a",
     marginBottom: 12,
     objectFit: "cover",
+    objectPosition: "top",
   },
   terminalBlock: {
     width: "100%",
