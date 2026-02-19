@@ -9,11 +9,16 @@ export default function HomePage() {
   return (
     <div style={styles.container}>
       <div style={styles.content}>
-        <h1 style={styles.title}>solana_vibes</h1>
+        <Link href="/" style={styles.titleLink}>
+          <h1 style={styles.title}>solana_vibes</h1>
+        </Link>
         <p style={styles.subtitle}>
           Send and claim vibes — unique NFTs on Solana. Use the Android app on
           your Seeker phone, or claim via link when someone sends you a vibe.
         </p>
+        <Link href="/check" style={styles.primaryLink}>
+          check for vibe
+        </Link>
         <Link href="/leaderboard" style={styles.link}>
           Leaderboard →
         </Link>
@@ -39,6 +44,10 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     textAlign: "center",
   },
+  titleLink: {
+    textDecoration: "none",
+    color: "inherit",
+  },
   title: {
     fontSize: 22,
     fontWeight: 300,
@@ -53,12 +62,20 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.5,
     marginBottom: 24,
   },
-  link: {
+  primaryLink: {
     display: "inline-block",
     padding: "12px 20px",
     border: "1px solid rgba(148,90,255,0.4)",
     borderRadius: 8,
     color: "#14F195",
+    fontSize: 14,
+    textDecoration: "none",
+    marginBottom: 12,
+  },
+  link: {
+    display: "inline-block",
+    padding: "12px 20px",
+    color: "rgba(255,255,255,0.5)",
     fontSize: 14,
     textDecoration: "none",
   },

@@ -253,7 +253,9 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
   if (claimState === "loading" || claimState === "error") {
     return (
       <div style={styles.container}>
-        <h1 style={styles.title}>solana_vibes</h1>
+        <a href="/" style={styles.titleLink}>
+          <h1 style={styles.title}>solana_vibes</h1>
+        </a>
         <div style={styles.centerContent}>
           {error && <p style={styles.errorText}>{error}</p>}
           <p style={styles.loadingText}>Loading vibe...</p>
@@ -265,7 +267,9 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
   return (
     <div style={styles.container}>
       <div style={styles.scrollContent}>
-        <h1 style={styles.title}>solana_vibes</h1>
+        <a href="/" style={styles.titleLink}>
+          <h1 style={styles.title}>solana_vibes</h1>
+        </a>
 
         {/* Vibe image */}
         {imageUrl && (
@@ -436,6 +440,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#050505",
     color: "#fff",
     padding: 16,
+    minHeight: "100vh",
     display: "block",
     boxSizing: "border-box",
   },
@@ -452,6 +457,10 @@ const styles: Record<string, React.CSSProperties> = {
   centerContent: {
     textAlign: "center",
     padding: 24,
+  },
+  titleLink: {
+    textDecoration: "none",
+    color: "inherit",
   },
   title: {
     fontSize: 20,

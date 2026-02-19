@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 const API_BASE = "";
 
@@ -38,6 +39,10 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 auto",
     paddingBottom: 32,
     boxSizing: "border-box",
+  },
+  titleLink: {
+    textDecoration: "none",
+    color: "inherit",
   },
   title: {
     fontSize: 20,
@@ -150,7 +155,9 @@ export function LeaderboardClient() {
   return (
     <div style={styles.container}>
       <div style={styles.scrollContent}>
-        <h1 style={styles.title}>solana_vibes</h1>
+        <Link href="/" style={styles.titleLink}>
+          <h1 style={styles.title}>solana_vibes</h1>
+        </Link>
 
         <div style={styles.toggleRow}>
           <button

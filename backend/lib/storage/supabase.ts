@@ -187,6 +187,42 @@ export async function getLeaderboardClaimedRows(): Promise<LeaderboardClaimedRow
   return (data ?? []) as LeaderboardClaimedRow[];
 }
 
+/**
+ * Record that a @username was checked (attempt to send a vibe to that username).
+ * Call this from the prepare flow. Requires table username_check_counts (username text primary key, check_count int default 0, updated_at timestamptz).
+ */
+export async function recordUsernameCheck(username: string): Promise<void> {
+  const normalized = username.replace(/^@/, "").toLowerCase();
+  if (!normalized) return;
+
+  const { data: row, error: selectError } = await supabase
+    .from("username_check_counts")
+    .select("check_count")
+    .eq("username", normalized)
+    .maybeSingle();
+
+  if (selectError) {
+    console.warn("[Supabase] recordUsernameCheck select failed (table may not exist):", selectError.message);
+    return;
+  }
+
+  const now = new Date().toISOString();
+  if (row) {
+    const { error: updateError } = await supabase
+      .from("username_check_counts")
+      .update({ check_count: (row as { check_count: number }).check_count + 1, updated_at: now })
+      .eq("username", normalized);
+    if (updateError) console.warn("[Supabase] recordUsernameCheck update failed:", updateError.message);
+  } else {
+    const { error: insertError } = await supabase.from("username_check_counts").insert({
+      username: normalized,
+      check_count: 1,
+      updated_at: now,
+    });
+    if (insertError) console.warn("[Supabase] recordUsernameCheck insert failed:", insertError.message);
+  }
+}
+
 export const vibeStore: IVibeStore = {
   async getNextVibeNumber() {
     // Get the current count of vibes to determine the next number

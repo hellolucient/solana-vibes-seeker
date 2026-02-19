@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { vibeStore, getVibeByUsername } from "@/lib/storage/supabase";
+import { vibeStore, getVibeByUsername, recordUsernameCheck } from "@/lib/storage/supabase";
 import { maskWallet } from "@/lib/wallet";
 import { generateVibeId } from "@/lib/id";
 import { buildMintTransaction } from "@/lib/solana/mint-transaction";
@@ -39,6 +39,9 @@ export async function POST(req: NextRequest) {
   if (!username) {
     return NextResponse.json({ error: "Invalid username" }, { status: 400 });
   }
+
+  // Track that this @username was checked (attempt to send a vibe to it)
+  recordUsernameCheck(username).catch(() => {});
 
   const vibeId = generateVibeId();
   const maskedWallet = maskWallet(senderWallet);
