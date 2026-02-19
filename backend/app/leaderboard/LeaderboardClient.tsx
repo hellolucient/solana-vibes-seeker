@@ -162,7 +162,7 @@ export function LeaderboardClient() {
                 : styles.toggleBtn
             }
           >
-            Vibers — This Week
+            vibers - this_week
           </button>
           <button
             type="button"
@@ -173,7 +173,7 @@ export function LeaderboardClient() {
                 : styles.toggleBtn
             }
           >
-            Claimed Vibes
+            claimed_vibes - total
           </button>
         </div>
 

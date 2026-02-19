@@ -148,14 +148,19 @@ export function LeaderboardScreen() {
           style={styles.backBtn}>
           <Text style={styles.backBtnText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>solana_vibes</Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+          hitSlop={{top: 12, bottom: 12, left: 24, right: 24}}>
+          <Text style={styles.title}>solana_vibes</Text>
+        </TouchableOpacity>
         <View style={styles.backBtn} />
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.screenTitle}>Leaderboard</Text>
+        <Text style={styles.screenTitle}>leaderboard</Text>
 
         <View style={styles.toggleRow}>
           <TouchableOpacity
@@ -167,7 +172,7 @@ export function LeaderboardScreen() {
                 styles.toggleBtnText,
                 view === 'week' && styles.toggleBtnTextActive,
               ]}>
-              Vibers — This Week
+              vibers - this_week
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -182,7 +187,7 @@ export function LeaderboardScreen() {
                 styles.toggleBtnText,
                 view === 'claimed' && styles.toggleBtnTextActive,
               ]}>
-              Claimed Vibes
+              claimed_vibes - total
             </Text>
           </TouchableOpacity>
         </View>
@@ -230,6 +235,7 @@ const styles = StyleSheet.create({
   screenTitle: {
     fontSize: 20,
     fontWeight: '300',
+    letterSpacing: 1.5,
     color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
     marginTop: 16,

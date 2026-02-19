@@ -428,7 +428,7 @@ export function MainScreen() {
             onPress={() => navigation.navigate('Leaderboard')}
             activeOpacity={0.7}
             style={styles.leaderboardLink}>
-            <Text style={styles.leaderboardLinkText}>Leaderboard</Text>
+            <Text style={styles.leaderboardLinkText}>leaderboard</Text>
           </TouchableOpacity>
 
           {/* Hero wave image */}
@@ -670,6 +670,7 @@ const styles = StyleSheet.create({
   },
   leaderboardLinkText: {
     fontSize: 13,
+    letterSpacing: 1.5,
     color: 'rgba(255,255,255,0.5)',
   },
 
