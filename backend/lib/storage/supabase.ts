@@ -139,6 +139,54 @@ export async function getClaimedVibeByUsername(username: string): Promise<VibeRe
   return data ? rowToRecord(data as VibeRow) : null;
 }
 
+/** Minimal row for leaderboard aggregation (vibes in last 7 days, minted only) */
+export interface LeaderboardWeekRow {
+  sender_wallet: string;
+  masked_wallet: string;
+  created_at: string;
+  claim_status: string;
+}
+
+/** Minimal row for claimed leaderboard (vibes sent that have been claimed) */
+export interface LeaderboardClaimedRow {
+  sender_wallet: string;
+  masked_wallet: string;
+  claimed_at: string | null;
+}
+
+/** Fetch all minted vibes from the last 7 days for leaderboard aggregation. */
+export async function getLeaderboardWeekRows(
+  sinceIso: string
+): Promise<LeaderboardWeekRow[]> {
+  const { data, error } = await supabase
+    .from("vibes")
+    .select("sender_wallet, masked_wallet, created_at, claim_status")
+    .gte("created_at", sinceIso)
+    .not("mint_address", "is", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[Supabase] getLeaderboardWeekRows error:", error);
+    return [];
+  }
+  return (data ?? []) as LeaderboardWeekRow[];
+}
+
+/** Fetch all claimed vibes for leaderboard aggregation (by sender). */
+export async function getLeaderboardClaimedRows(): Promise<LeaderboardClaimedRow[]> {
+  const { data, error } = await supabase
+    .from("vibes")
+    .select("sender_wallet, masked_wallet, claimed_at")
+    .eq("claim_status", "claimed")
+    .order("claimed_at", { ascending: false, nullsFirst: false });
+
+  if (error) {
+    console.error("[Supabase] getLeaderboardClaimedRows error:", error);
+    return [];
+  }
+  return (data ?? []) as LeaderboardClaimedRow[];
+}
+
 export const vibeStore: IVibeStore = {
   async getNextVibeNumber() {
     // Get the current count of vibes to determine the next number

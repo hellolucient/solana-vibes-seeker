@@ -424,6 +424,12 @@ export function MainScreen() {
             hitSlop={{top: 8, bottom: 8, left: 24, right: 24}}>
             <Text style={styles.title}>solana_vibes</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Leaderboard')}
+            activeOpacity={0.7}
+            style={styles.leaderboardLink}>
+            <Text style={styles.leaderboardLinkText}>Leaderboard</Text>
+          </TouchableOpacity>
 
           {/* Hero wave image */}
           <Image
@@ -657,6 +663,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginTop: 4,
     marginBottom: 2,
+  },
+  leaderboardLink: {
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
+  leaderboardLinkText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
   },
 
   // Hero image — compact height for Seeker
