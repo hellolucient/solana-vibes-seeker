@@ -22,7 +22,7 @@ export function SendVibeScreen() {
   const {connected, publicKey, signTransaction} = useMobileWallet();
   const {prepareVibe, confirmVibe} = useVibeApi();
 
-  const [targetUsername, setTargetUsername] = useState('');
+  const [targetUsername, setTargetUsername] = useState('@');
   const [sendState, setSendState] = useState<SendState>('idle');
   const [vibeResult, setVibeResult] = useState<{
     id: string;
@@ -101,7 +101,7 @@ export function SendVibeScreen() {
   };
 
   const handleReset = () => {
-    setTargetUsername('');
+    setTargetUsername('@');
     setSendState('idle');
     setVibeResult(null);
     setError(null);
@@ -180,12 +180,19 @@ export function SendVibeScreen() {
         <View style={styles.formContainer}>
           <Text style={styles.label}>Who do you want to vibe?</Text>
           <View style={styles.inputContainer}>
-            <Text style={styles.inputPrefix}>@</Text>
             <TextInput
               style={styles.input}
               value={targetUsername}
-              onChangeText={setTargetUsername}
-              placeholder="username"
+              onChangeText={(text) => {
+                // Ensure it always starts with '@'
+                if (!text.startsWith('@')) {
+                  text = '@' + text;
+                }
+                // Remove any '@' symbols after the first character
+                const cleaned = text.charAt(0) + text.slice(1).replace(/@/g, '');
+                setTargetUsername(cleaned);
+              }}
+              placeholder="@username"
               placeholderTextColor="#666666"
               autoCapitalize="none"
               autoCorrect={false}
@@ -207,10 +214,10 @@ export function SendVibeScreen() {
           <TouchableOpacity
             style={[
               styles.primaryButton,
-              (!targetUsername.trim() || isLoading) && styles.primaryButtonDisabled,
+              (!targetUsername.replace('@', '').trim() || isLoading) && styles.primaryButtonDisabled,
             ]}
             onPress={handleSendVibe}
-            disabled={!targetUsername.trim() || isLoading}>
+            disabled={!targetUsername.replace('@', '').trim() || isLoading}>
             {isLoading ? (
               <View style={styles.loadingContent}>
                 <ActivityIndicator color="#0a0a0a" size="small" />

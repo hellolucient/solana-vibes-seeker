@@ -60,7 +60,7 @@ export function MainScreen() {
     useMobileWallet();
   const {prepareVibe, confirmVibe, lookupVibeForUser} = useVibeApi();
 
-  const [targetUsername, setTargetUsername] = useState('');
+  const [targetUsername, setTargetUsername] = useState('@');
   const [sendState, setSendState] = useState<SendState>('idle');
   const [vibeResult, setVibeResult] = useState<{
     vibeId: string;
@@ -372,7 +372,7 @@ export function MainScreen() {
   }, [checkVibeStatus]);
 
   const handleReset = useCallback(() => {
-    setTargetUsername('');
+    setTargetUsername('@');
     setSendState('idle');
     setVibeResult(null);
     setError(null);
@@ -385,7 +385,7 @@ export function MainScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     // Reset to idle + re-check vibe status
-    setTargetUsername('');
+    setTargetUsername('@');
     setSendState('idle');
     setVibeResult(null);
     setError(null);
@@ -578,7 +578,15 @@ export function MainScreen() {
                 <TextInput
                   style={styles.input}
                   value={targetUsername}
-                  onChangeText={setTargetUsername}
+                  onChangeText={(text) => {
+                    // Ensure it always starts with '@'
+                    if (!text.startsWith('@')) {
+                      text = '@' + text;
+                    }
+                    // Remove any '@' symbols after the first character
+                    const cleaned = text.charAt(0) + text.slice(1).replace(/@/g, '');
+                    setTargetUsername(cleaned);
+                  }}
                   placeholder="@username"
                   placeholderTextColor="rgba(255,255,255,0.25)"
                   autoCapitalize="none"
@@ -618,11 +626,11 @@ export function MainScreen() {
               <TouchableOpacity
                 style={[
                   styles.btnSend,
-                  (!connected || !targetUsername.trim()) &&
+                  (!connected || !targetUsername.replace('@', '').trim()) &&
                     styles.btnSendDisabled,
                 ]}
                 onPress={handleSendVibe}
-                disabled={!connected || !targetUsername.trim()}
+                disabled={!connected || !targetUsername.replace('@', '').trim()}
                 activeOpacity={0.8}>
                 <Text style={styles.btnSendLabel}>send vibe</Text>
               </TouchableOpacity>
