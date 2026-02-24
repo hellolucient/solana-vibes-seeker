@@ -8,7 +8,7 @@
  * - Top-right: Global vibe #N (total vibes minted across app)
  * - Middle area: Faint binary decoration (101010...)
  * - Bottom: Footer with vibe info (green terminal style)
- * - Bottom-right: Nth vibe for this @username (e.g. #3 = 3rd vibe sent to that handle)
+ * - Bottom-right: Nth vibe for this @username (e.g. "3rd vibe" = 3rd vibe sent to that handle)
  */
 
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
@@ -75,6 +75,15 @@ function ensureOutputDir(outputPath: string) {
 function maskMintAddress(address: string): string {
   if (address.length <= 12) return address;
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+/** Ordinal label for recipient vibe index: 1 -> "1st vibe", 2 -> "2nd vibe", 3 -> "3rd vibe", etc. */
+function getOrdinalVibeLabel(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  const suffix =
+    mod100 >= 11 && mod100 <= 13 ? "th" : mod10 === 1 ? "st" : mod10 === 2 ? "nd" : mod10 === 3 ? "rd" : "th";
+  return `${n}${suffix} vibe`;
 }
 
 /**
@@ -316,7 +325,7 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
   const maskedMint = maskMintAddress(mintAddress);
   const formattedTime = formatTimestamp(timestamp);
   const vibeNumberText = vibeNumber ? `#${vibeNumber}` : "";
-  const vibeIndexText = vibeIndexForRecipient ? `#${vibeIndexForRecipient}` : "";
+  const vibeIndexText = vibeIndexForRecipient != null ? getOrdinalVibeLabel(vibeIndexForRecipient) : "";
 
   // Footer text lines (vibe number removed - now shown in top-right corner)
   const footerLines = [
@@ -430,7 +439,7 @@ export async function generateVibeImageBuffer(
   const maskedMint = maskMintAddress(mintAddress);
   const formattedTime = formatTimestamp(timestamp);
   const vibeNumberText = vibeNumber ? `#${vibeNumber}` : "";
-  const vibeIndexText = vibeIndexForRecipient ? `#${vibeIndexForRecipient}` : "";
+  const vibeIndexText = vibeIndexForRecipient != null ? getOrdinalVibeLabel(vibeIndexForRecipient) : "";
 
   // Footer text lines (vibe number removed - now shown in top-right corner)
   const footerLines = [

@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, useNavigation} from '@react-navigation/native';
@@ -160,6 +161,8 @@ export function ClaimVibeScreen() {
         }> = [];
         for (let i = 0; i < prepareResult.transactions.length; i++) {
           setSigningProgress({ current: i + 1, total });
+          // Brief delay so UI can show "Signing 2 of 2" before wallet popup appears again
+          await new Promise((r) => setTimeout(r, 400));
           const t = prepareResult.transactions[i];
           const signed = await signTransaction(t.transaction);
           signedItems.push({
@@ -280,6 +283,22 @@ export function ClaimVibeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Fixed signing banner: upper-middle so wallet popup doesn't hide it */}
+      {isProcessing && claimState === 'signing' && (
+        <View style={styles.signingOverlay} pointerEvents="none">
+          <View style={styles.signingBanner}>
+            <Text style={styles.signingBannerTitle}>
+              {signingProgress && signingProgress.total > 1
+                ? `Signing transaction ${signingProgress.current} of ${signingProgress.total}`
+                : 'Waiting for your signature'}
+            </Text>
+            <Text style={styles.signingBannerSub}>
+              Use the same wallet that&apos;s connected — don&apos;t switch accounts.
+            </Text>
+          </View>
+        </View>
+      )}
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
@@ -363,20 +382,6 @@ export function ClaimVibeScreen() {
               <Text style={styles.pendingCountText}>
                 You have {pendingCount} pending vibes to claim.
               </Text>
-            )}
-
-            {/* Visible "Signing 1 of N" and wallet reminder when signing */}
-            {isProcessing && claimState === 'signing' && (
-              <View style={styles.signingBanner}>
-                <Text style={styles.signingBannerTitle}>
-                  {signingProgress && signingProgress.total > 1
-                    ? `Signing transaction ${signingProgress.current} of ${signingProgress.total}`
-                    : 'Waiting for your signature'}
-                </Text>
-                <Text style={styles.signingBannerSub}>
-                  Use the same wallet that&apos;s connected — don&apos;t switch accounts.
-                </Text>
-              </View>
             )}
 
             {/* Connect wallet if needed */}
@@ -566,15 +571,24 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 12,
   },
+  signingOverlay: {
+    position: 'absolute',
+    top: Dimensions.get('window').height * 0.22,
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   signingBanner: {
     width: '100%',
-    backgroundColor: 'rgba(20,241,149,0.08)',
+    maxWidth: 340,
+    backgroundColor: 'rgba(20,241,149,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(20,241,149,0.25)',
+    borderColor: 'rgba(20,241,149,0.35)',
     borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     alignItems: 'center',
   },
   signingBannerTitle: {

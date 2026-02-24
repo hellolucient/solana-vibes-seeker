@@ -185,6 +185,14 @@ async function uploadToLocalFilesystem(params: {
 
 /**
  * Generate NFT metadata for a vibe.
+ *
+ * Attributes section (as shown in wallet / explorer):
+ * - Vibe Number (global): "#123" — total vibes minted across the app (this NFT's global order).
+ * - Recipient: "@username" — X handle this vibe was sent to.
+ * - Recipient Vibe: "3rd vibe" — this is the Nth vibe sent to that @username (ordinal).
+ * - Sender Wallet: "abc1...xyz9" — masked sender wallet.
+ * - Mint: "<mint address>" — token mint.
+ * - Created: "<ISO timestamp>" — when the vibe was created.
  */
 export function createVibeMetadata(params: {
   vibeId: string;
@@ -213,13 +221,26 @@ export function createVibeMetadata(params: {
     { trait_type: "Created", value: timestamp },
   ];
 
-  // Add vibe number if available (global)
+  // Global sequential number (total vibes minted across the app) — appears as "Vibe Number (global): #123"
   if (vibeNumber) {
-    attributes.unshift({ trait_type: "Vibe Number", value: `#${vibeNumber}` });
+    attributes.unshift({ trait_type: "Vibe Number (global)", value: `#${vibeNumber}` });
   }
-  // Per-recipient index (Nth vibe for this @username)
+  // Nth vibe sent to this @username — appears as "Recipient Vibe: 3rd vibe"
   if (vibeIndexForRecipient != null) {
-    attributes.push({ trait_type: "Vibe Index (Recipient)", value: `#${vibeIndexForRecipient}` });
+    const ord =
+      [11, 12, 13].includes(vibeIndexForRecipient % 100)
+        ? "th"
+        : vibeIndexForRecipient % 10 === 1
+          ? "st"
+          : vibeIndexForRecipient % 10 === 2
+            ? "nd"
+            : vibeIndexForRecipient % 10 === 3
+              ? "rd"
+              : "th";
+    attributes.push({
+      trait_type: "Recipient Vibe",
+      value: `${vibeIndexForRecipient}${ord} vibe`,
+    });
   }
 
   return {
