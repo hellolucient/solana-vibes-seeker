@@ -27,13 +27,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Parse request body
-  let body: { 
-    vibeId: string; 
-    claimerWallet: string; 
-    signedTransaction: string;
-    blockhash: string;
-    lastValidBlockHeight: number;
+  // Parse request body — single or multiple (signedTransactions array)
+  let body: {
+    vibeId?: string;
+    claimerWallet: string;
+    signedTransaction?: string;
+    blockhash?: string;
+    lastValidBlockHeight?: number;
+    signedTransactions?: Array<{
+      vibeId: string;
+      signedTransaction: string;
+      blockhash: string;
+      lastValidBlockHeight: number;
+    }>;
   };
   try {
     body = await req.json();
@@ -41,100 +47,114 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { vibeId, claimerWallet, signedTransaction, blockhash, lastValidBlockHeight } = body;
-  if (!vibeId || !claimerWallet || !signedTransaction) {
+  const { claimerWallet } = body;
+  const items: Array<{ vibeId: string; signedTransaction: string; blockhash: string; lastValidBlockHeight: number }> =
+    Array.isArray(body.signedTransactions) && body.signedTransactions.length > 0
+      ? body.signedTransactions
+      : body.vibeId && body.signedTransaction && body.blockhash != null && body.lastValidBlockHeight != null
+        ? [
+            {
+              vibeId: body.vibeId,
+              signedTransaction: body.signedTransaction,
+              blockhash: body.blockhash,
+              lastValidBlockHeight: body.lastValidBlockHeight,
+            },
+          ]
+        : [];
+
+  if (!items.length || !claimerWallet) {
     return NextResponse.json(
-      { error: "Missing vibeId, claimerWallet, or signedTransaction" },
+      { error: "Missing vibeId/signedTransaction or signedTransactions array, or claimerWallet" },
       { status: 400 }
     );
   }
 
   try {
-    // Get the vibe record
-    const vibe = await vibeStore.getById(vibeId);
-    if (!vibe) {
-      return NextResponse.json({ error: "Vibe not found" }, { status: 404 });
-    }
-
-    if (!vibe.mintAddress) {
-      return NextResponse.json(
-        { error: "Vibe has no mint address" },
-        { status: 400 }
-      );
-    }
-
-    // Deserialize the signed transaction
-    const transactionBuffer = Buffer.from(signedTransaction, "base64");
-    const transaction = VersionedTransaction.deserialize(transactionBuffer);
-
-    // Send to RPC from backend (avoids mobile client RPC issues)
     const connection = new Connection(getRpcUrl(), "confirmed");
-    
-    console.log(`[vibe/claim/confirm] Sending transaction to RPC...`);
-    const signature = await connection.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-      maxRetries: 3,
-    });
-    console.log(`[vibe/claim/confirm] Transaction sent: ${signature}`);
+    const results: Array<{ vibeId: string; mintAddress: string; signature: string }> = [];
 
-    // Wait for confirmation using polling (WebSocket doesn't work in serverless)
-    console.log(`[vibe/claim/confirm] Waiting for confirmation (polling)...`);
-    const maxRetries = 30;
-    const retryDelay = 1000; // 1 second
-    
-    for (let i = 0; i < maxRetries; i++) {
-      const statuses = await connection.getSignatureStatuses([signature]);
-      const status = statuses.value[0];
-      
-      if (status) {
-        if (status.err) {
-          console.error(`[vibe/claim/confirm] Transaction failed:`, status.err);
+    for (const item of items) {
+      const { vibeId, signedTransaction, blockhash, lastValidBlockHeight } = item;
+
+      const vibe = await vibeStore.getById(vibeId);
+      if (!vibe) {
+        return NextResponse.json({ error: `Vibe not found: ${vibeId}` }, { status: 404 });
+      }
+      if (!vibe.mintAddress) {
+        return NextResponse.json(
+          { error: `Vibe ${vibeId} has no mint address` },
+          { status: 400 }
+        );
+      }
+
+      const transactionBuffer = Buffer.from(signedTransaction, "base64");
+      const transaction = VersionedTransaction.deserialize(transactionBuffer);
+
+      console.log(`[vibe/claim/confirm] Sending transaction to RPC...`);
+      const signature = await connection.sendRawTransaction(transaction.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+      console.log(`[vibe/claim/confirm] Transaction sent: ${signature}`);
+
+      const maxRetries = 30;
+      const retryDelay = 1000;
+
+      for (let i = 0; i < maxRetries; i++) {
+        const statuses = await connection.getSignatureStatuses([signature]);
+        const status = statuses.value[0];
+
+        if (status) {
+          if (status.err) {
+            console.error(`[vibe/claim/confirm] Transaction failed:`, status.err);
+            return NextResponse.json(
+              { error: "Transaction failed on-chain" },
+              { status: 500 }
+            );
+          }
+          if (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized") {
+            console.log(`[vibe/claim/confirm] Transaction confirmed: ${signature}`);
+            break;
+          }
+        }
+
+        const blockHeight = await connection.getBlockHeight();
+        if (blockHeight > lastValidBlockHeight) {
+          console.error(`[vibe/claim/confirm] Blockhash expired`);
           return NextResponse.json(
-            { error: "Transaction failed on-chain" },
+            { error: "Transaction expired - please try again" },
             { status: 500 }
           );
         }
-        
-        if (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized") {
-          console.log(`[vibe/claim/confirm] Transaction confirmed: ${signature}`);
-          break;
-        }
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
-      
-      // Check if blockhash expired
-      const blockHeight = await connection.getBlockHeight();
-      if (blockHeight > lastValidBlockHeight) {
-        console.error(`[vibe/claim/confirm] Blockhash expired`);
-        return NextResponse.json(
-          { error: "Transaction expired - please try again" },
-          { status: 500 }
-        );
-      }
-      
-      // Wait before next poll
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
-    }
-    
-    console.log(`[vibe/claim/confirm] Transaction confirmed: ${signature}`);
 
-    // Update the database
-    await vibeStore.update(vibeId, {
-      claimStatus: "claimed",
-      claimerWallet,
-      claimedAt: new Date().toISOString(),
-    });
+      await vibeStore.update(vibeId, {
+        claimStatus: "claimed",
+        claimerWallet,
+        claimedAt: new Date().toISOString(),
+      });
+
+      results.push({ vibeId, mintAddress: vibe.mintAddress, signature });
+    }
 
     console.log(
-      `[vibe/claim/confirm] Claim confirmed for @${xUsername}, vibe ${vibeId}, sig: ${signature}`
+      `[vibe/claim/confirm] Claim confirmed for @${xUsername}, ${results.length} vibe(s)`
     );
 
-    return NextResponse.json({
+    const first = results[0];
+    const payload: Record<string, unknown> = {
       success: true,
-      vibeId,
-      mintAddress: vibe.mintAddress,
-      claimerWallet,
-      signature,
-    });
+      results,
+    };
+    if (results.length === 1) {
+      payload.vibeId = first.vibeId;
+      payload.mintAddress = first.mintAddress;
+      payload.claimerWallet = claimerWallet;
+      payload.signature = first.signature;
+    }
+
+    return NextResponse.json(payload);
   } catch (e) {
     console.error("[vibe/claim/confirm] Error:", e);
     return NextResponse.json(

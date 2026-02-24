@@ -12,8 +12,11 @@ export interface VibeRecord {
   maskedWallet: string; // first 3 + … + last 3
   createdAt: string; // ISO timestamp
 
-  // Vibe number - sequential count of all vibes created
+  // Vibe number - sequential count of all vibes created (global, top-right on NFT)
   vibeNumber?: number;
+
+  // Per-recipient index: Nth vibe sent to this @username (set at confirm, bottom-right on NFT)
+  vibeIndexForRecipient?: number;
 
   // On-chain data (populated after mint)
   mintAddress?: string; // Metaplex Core asset address

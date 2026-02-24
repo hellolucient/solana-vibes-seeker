@@ -195,8 +195,9 @@ export function createVibeMetadata(params: {
   timestamp: string;
   baseUrl: string;
   vibeNumber?: number;
+  vibeIndexForRecipient?: number;
 }): VibeMetadata {
-  const { vibeId, recipientHandle, maskedWallet, mintAddress, timestamp, baseUrl, vibeNumber } =
+  const { vibeId, recipientHandle, maskedWallet, mintAddress, timestamp, baseUrl, vibeNumber, vibeIndexForRecipient } =
     params;
 
   const handle = recipientHandle.startsWith("@") ? recipientHandle : `@${recipientHandle}`;
@@ -212,9 +213,13 @@ export function createVibeMetadata(params: {
     { trait_type: "Created", value: timestamp },
   ];
 
-  // Add vibe number if available
+  // Add vibe number if available (global)
   if (vibeNumber) {
     attributes.unshift({ trait_type: "Vibe Number", value: `#${vibeNumber}` });
+  }
+  // Per-recipient index (Nth vibe for this @username)
+  if (vibeIndexForRecipient != null) {
+    attributes.push({ trait_type: "Vibe Index (Recipient)", value: `#${vibeIndexForRecipient}` });
   }
 
   return {

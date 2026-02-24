@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 // Allow up to 90s for confirmation polling (Vercel default can be 15s)
 export const maxDuration = 90;
 import { Connection, VersionedTransaction } from "@solana/web3.js";
-import { vibeStore } from "@/lib/storage/supabase";
+import { vibeStore, getNextRecipientVibeIndex } from "@/lib/storage/supabase";
 import { maskWallet } from "@/lib/wallet";
 import { generateVibeImageBuffer } from "@/lib/image/generate-vibe-image";
 import { uploadVibeAssets, createVibeMetadata } from "@/lib/storage/upload";
@@ -198,6 +198,10 @@ export async function POST(req: NextRequest) {
 
     console.log(`[vibe/confirm] Transaction confirmed: ${signature}`);
 
+    // Assign per-recipient vibe index (Option B: at confirm time, no gaps)
+    const vibeIndexForRecipient = await getNextRecipientVibeIndex(vibe.targetUsername);
+    await vibeStore.update(vibeId, { vibeIndexForRecipient });
+
     // Step 4: Generate final image
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
     const timestamp = new Date().toISOString();
@@ -209,6 +213,7 @@ export async function POST(req: NextRequest) {
       mintAddress: vibe.mintAddress,
       timestamp,
       vibeNumber: vibe.vibeNumber,
+      vibeIndexForRecipient,
     });
 
     console.log("[vibe/confirm] Image generated");
@@ -223,6 +228,7 @@ export async function POST(req: NextRequest) {
       timestamp,
       baseUrl,
       vibeNumber: vibe.vibeNumber,
+      vibeIndexForRecipient,
     });
 
     const { imageUri, metadataUri } = await uploadVibeAssets({

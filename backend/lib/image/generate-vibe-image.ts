@@ -5,14 +5,10 @@
  * 
  * Text elements rendered on the image:
  * - Top-left: @handle (subtle semi-transparent gray)
- * - Top-right: Vibe number #N (subtle semi-transparent gray)
+ * - Top-right: Global vibe #N (total vibes minted across app)
  * - Middle area: Faint binary decoration (101010...)
  * - Bottom: Footer with vibe info (green terminal style)
- *   - "> received solana_vibes"
- *   - "> verified by wallet <masked_wallet>"
- *   - "> mint <masked_mint>"
- *   - Timestamp (UTC)
- *   - "> for @handle"
+ * - Bottom-right: Nth vibe for this @username (e.g. #3 = 3rd vibe sent to that handle)
  */
 
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
@@ -34,6 +30,9 @@ const LINE_HEIGHT = 18;
 const FOOTER_COLOR = "#00ff00";
 const BINARY_COLOR = "rgba(0, 255, 0, 0.06)"; // Very faint green for binary decoration
 const SUBTLE_GRAY = "rgba(128, 128, 128, 0.25)"; // Subtle gray for corner text
+
+/** Standard NFT display size; many wallets (e.g. Phantom) show square and can crop non-square images. */
+export const NFT_OUTPUT_SIZE = 1080;
 
 // Cache the font data
 let fontData: Buffer | null = null;
@@ -59,7 +58,8 @@ export interface GenerateVibeImageOptions {
   mintAddress: string;
   timestamp: string; // ISO string
   outputPath: string;
-  vibeNumber?: number; // Sequential vibe count
+  vibeNumber?: number; // Global sequential vibe count (top-right)
+  vibeIndexForRecipient?: number; // Nth vibe for this @username (bottom-right)
 }
 
 function ensureOutputDir(outputPath: string) {
@@ -278,7 +278,7 @@ async function generateBinaryOverlay(width: number, height: number): Promise<Buf
  * Force regenerate (overwrite) since content may change.
  */
 export async function generateVibeImage(options: GenerateVibeImageOptions): Promise<Buffer> {
-  const { maskedWallet, recipientHandle, mintAddress, timestamp, outputPath, vibeNumber } = options;
+  const { maskedWallet, recipientHandle, mintAddress, timestamp, outputPath, vibeNumber, vibeIndexForRecipient } = options;
 
   ensureOutputDir(outputPath);
   const t0 = Date.now();
@@ -294,6 +294,7 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
   const maskedMint = maskMintAddress(mintAddress);
   const formattedTime = formatTimestamp(timestamp);
   const vibeNumberText = vibeNumber ? `#${vibeNumber}` : "";
+  const vibeIndexText = vibeIndexForRecipient ? `#${vibeIndexForRecipient}` : "";
 
   // Footer text lines (vibe number removed - now shown in top-right corner)
   const footerLines = [
@@ -320,8 +321,20 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
   if (vibeNumberText) {
     overlayPromises.push(generateCornerOverlay(width, cornerHeight, vibeNumberText, "right"));
   }
+  // Bottom-right: Nth vibe for this @username
+  if (vibeIndexText) {
+    overlayPromises.push(generateCornerOverlay(width, cornerHeight, vibeIndexText, "right"));
+  }
 
-  const [footerBuffer, binaryBuffer, handleBuffer, vibeNumberBuffer] = await Promise.all(overlayPromises);
+  const overlayResults = await Promise.all(overlayPromises);
+  const footerBuffer = overlayResults[0];
+  const binaryBuffer = overlayResults[1];
+  const handleBuffer = overlayResults[2];
+  let vibeNumberBuffer: Buffer | undefined;
+  let vibeIndexBuffer: Buffer | undefined;
+  let oIdx = 3;
+  if (vibeNumberText) vibeNumberBuffer = overlayResults[oIdx++];
+  if (vibeIndexText) vibeIndexBuffer = overlayResults[oIdx];
 
   const composites = [
     // Binary decoration (very faint)
@@ -352,14 +365,27 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
       left: 0,
     });
   }
+  // Add Nth vibe for recipient at bottom-right
+  if (vibeIndexBuffer) {
+    composites.push({
+      input: vibeIndexBuffer,
+      top: height - cornerHeight,
+      left: 0,
+    });
+  }
 
   const outBuffer = await image
     .composite(composites)
+    .resize(NFT_OUTPUT_SIZE, NFT_OUTPUT_SIZE, {
+      fit: "contain",
+      position: "center",
+      background: { r: 0, g: 0, b: 0, alpha: 1 },
+    })
     .png()
     .toBuffer();
 
   writeFileSync(outputPath, outBuffer);
-  console.log(`[vibe/image] Written ${outputPath} in ${Date.now() - t0}ms`);
+  console.log(`[vibe/image] Written ${outputPath} (${NFT_OUTPUT_SIZE}x${NFT_OUTPUT_SIZE}) in ${Date.now() - t0}ms`);
 
   return outBuffer;
 }
@@ -371,7 +397,7 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
 export async function generateVibeImageBuffer(
   options: Omit<GenerateVibeImageOptions, "outputPath">
 ): Promise<Buffer> {
-  const { maskedWallet, recipientHandle, mintAddress, timestamp, vibeNumber } = options;
+  const { maskedWallet, recipientHandle, mintAddress, timestamp, vibeNumber, vibeIndexForRecipient } = options;
   const t0 = Date.now();
 
   const image = sharp(BASE_IMAGE_PATH);
@@ -385,6 +411,7 @@ export async function generateVibeImageBuffer(
   const maskedMint = maskMintAddress(mintAddress);
   const formattedTime = formatTimestamp(timestamp);
   const vibeNumberText = vibeNumber ? `#${vibeNumber}` : "";
+  const vibeIndexText = vibeIndexForRecipient ? `#${vibeIndexForRecipient}` : "";
 
   // Footer text lines (vibe number removed - now shown in top-right corner)
   const footerLines = [
@@ -411,45 +438,70 @@ export async function generateVibeImageBuffer(
   if (vibeNumberText) {
     overlayPromises.push(generateCornerOverlay(width, cornerHeight, vibeNumberText, "right"));
   }
+  // Bottom-right: Nth vibe for this @username
+  if (vibeIndexText) {
+    overlayPromises.push(generateCornerOverlay(width, cornerHeight, vibeIndexText, "right"));
+  }
 
-  const [footerBuffer, binaryBuffer, handleBuffer, vibeNumberBuffer] = await Promise.all(overlayPromises);
+  const overlayResultsBuffer = await Promise.all(overlayPromises);
+  const footerBufferB = overlayResultsBuffer[0];
+  const binaryBufferB = overlayResultsBuffer[1];
+  const handleBufferB = overlayResultsBuffer[2];
+  let vibeNumberBufferB: Buffer | undefined;
+  let vibeIndexBufferB: Buffer | undefined;
+  let oIdxB = 3;
+  if (vibeNumberText) vibeNumberBufferB = overlayResultsBuffer[oIdxB++];
+  if (vibeIndexText) vibeIndexBufferB = overlayResultsBuffer[oIdxB];
 
-  const composites = [
+  const compositesBuffer = [
     // Binary decoration (very faint)
     {
-      input: binaryBuffer,
+      input: binaryBufferB,
       top: Math.floor(height * 0.35),
       left: 0,
     },
     // @handle at top-left (Montserrat Black, subtle gray)
     {
-      input: handleBuffer,
+      input: handleBufferB,
       top: 0,
       left: 0,
     },
     // Footer overlay at bottom
     {
-      input: footerBuffer,
+      input: footerBufferB,
       top: height - footerHeight,
       left: 0,
     },
   ];
 
   // Add vibe number at top-right if available
-  if (vibeNumberBuffer) {
-    composites.push({
-      input: vibeNumberBuffer,
+  if (vibeNumberBufferB) {
+    compositesBuffer.push({
+      input: vibeNumberBufferB,
       top: 0,
+      left: 0,
+    });
+  }
+  // Add Nth vibe for recipient at bottom-right
+  if (vibeIndexBufferB) {
+    compositesBuffer.push({
+      input: vibeIndexBufferB,
+      top: height - cornerHeight,
       left: 0,
     });
   }
 
   const outBuffer = await image
-    .composite(composites)
+    .composite(compositesBuffer)
+    .resize(NFT_OUTPUT_SIZE, NFT_OUTPUT_SIZE, {
+      fit: "contain",
+      position: "center",
+      background: { r: 0, g: 0, b: 0, alpha: 1 },
+    })
     .png()
     .toBuffer();
 
-  console.log(`[vibe/image] Generated buffer in ${Date.now() - t0}ms`);
+  console.log(`[vibe/image] Generated buffer (${NFT_OUTPUT_SIZE}x${NFT_OUTPUT_SIZE}) in ${Date.now() - t0}ms`);
 
   return outBuffer;
 }

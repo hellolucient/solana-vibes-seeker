@@ -165,6 +165,20 @@ interface ConfirmVibeParams {
   claimerWallet?: string;
 }
 
+interface ConfirmClaimParams {
+  claimerWallet: string;
+  vibeId?: string;
+  signedTransaction?: Transaction | VersionedTransaction;
+  blockhash?: string;
+  lastValidBlockHeight?: number;
+  signedTransactions?: Array<{
+    vibeId: string;
+    signedTransaction: Transaction | VersionedTransaction;
+    blockhash: string;
+    lastValidBlockHeight: number;
+  }>;
+}
+
 interface ConfirmVibeResult {
   vibeId: string;
   vibeUrl: string;
@@ -172,15 +186,25 @@ interface ConfirmVibeResult {
 }
 
 interface PrepareClaimParams {
-  vibeId: string;
+  vibeId?: string;
+  vibeIds?: string[];
   claimerWallet: string;
   xUsername: string;
 }
 
 interface PrepareClaimResult {
-  transaction: Transaction | VersionedTransaction;
-  blockhash: string;
-  lastValidBlockHeight: number;
+  transaction?: Transaction | VersionedTransaction;
+  blockhash?: string;
+  lastValidBlockHeight?: number;
+  /** When claiming multiple */
+  transactions?: Array<{
+    vibeId: string;
+    transaction: Transaction | VersionedTransaction;
+    blockhash: string;
+    lastValidBlockHeight: number;
+    feeSol: number;
+  }>;
+  feeSolPerNft?: number;
 }
 
 interface VibeDetails {
@@ -315,20 +339,27 @@ export function useVibeApi() {
   );
 
   /**
-   * Prepare a claim transaction
+   * Prepare a claim transaction (single or multiple vibes).
+   * Pass vibeIds for multi-claim (oldest first); vibeId for single.
    */
   const prepareClaim = useCallback(
     async (params: PrepareClaimParams): Promise<PrepareClaimResult> => {
+      const body: Record<string, unknown> = {
+        claimerWallet: params.claimerWallet,
+        xUsername: params.xUsername,
+      };
+      if (params.vibeIds?.length) {
+        body.vibeIds = params.vibeIds;
+      } else if (params.vibeId) {
+        body.vibeId = params.vibeId;
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/vibe/claim/prepare`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          vibeId: params.vibeId,
-          claimerWallet: params.claimerWallet,
-          xUsername: params.xUsername,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -339,28 +370,75 @@ export function useVibeApi() {
 
       const data = await response.json();
 
-      // Deserialize the transaction (handles both legacy and versioned)
-      const transaction = deserializeTransaction(data.transaction);
+      if (data.transactions && Array.isArray(data.transactions) && data.transactions.length > 0) {
+        const transactions = data.transactions.map(
+          (t: {
+            vibeId: string;
+            transaction: string;
+            blockhash: string;
+            lastValidBlockHeight: number;
+            feeSol: number;
+          }) => ({
+            vibeId: t.vibeId,
+            transaction: deserializeTransaction(t.transaction),
+            blockhash: t.blockhash,
+            lastValidBlockHeight: t.lastValidBlockHeight,
+            feeSol: t.feeSol ?? 0.001,
+          }),
+        );
+        return {
+          transactions,
+          feeSolPerNft: data.feeSolPerNft ?? 0.001,
+        };
+      }
 
-      return {
-        transaction,
-        blockhash: data.blockhash,
-        lastValidBlockHeight: data.lastValidBlockHeight,
-      };
+      if (data.transaction && data.vibeId) {
+        return {
+          transaction: deserializeTransaction(data.transaction),
+          blockhash: data.blockhash,
+          lastValidBlockHeight: data.lastValidBlockHeight,
+        };
+      }
+
+      throw new Error('Invalid response from server — missing transaction data');
     },
     [],
   );
 
   /**
-   * Confirm claim after signing
+   * Confirm claim after signing (single or multiple).
    */
   const confirmClaim = useCallback(
-    async (params: ConfirmVibeParams): Promise<void> => {
-      // Serialize the signed transaction, handling both legacy and versioned
-      const txBase64 = serializeSignedTransaction(params.signedTransaction);
+    async (params: ConfirmClaimParams): Promise<void> => {
+      let body: Record<string, unknown> = {
+        claimerWallet: params.claimerWallet,
+      };
 
-      // Use fetchWithRetry because the app resumes from background after
-      // MWA wallet signing, and the network connection may be stale
+      if (
+        params.signedTransactions &&
+        Array.isArray(params.signedTransactions) &&
+        params.signedTransactions.length > 0
+      ) {
+        body.signedTransactions = params.signedTransactions.map((t) => ({
+          vibeId: t.vibeId,
+          signedTransaction: serializeSignedTransaction(t.signedTransaction),
+          blockhash: t.blockhash,
+          lastValidBlockHeight: t.lastValidBlockHeight,
+        }));
+      } else if (
+        params.vibeId &&
+        params.signedTransaction &&
+        params.blockhash != null &&
+        params.lastValidBlockHeight != null
+      ) {
+        body.vibeId = params.vibeId;
+        body.signedTransaction = serializeSignedTransaction(params.signedTransaction);
+        body.blockhash = params.blockhash;
+        body.lastValidBlockHeight = params.lastValidBlockHeight;
+      } else {
+        throw new Error('Missing signedTransaction or signedTransactions');
+      }
+
       const response = await fetchWithRetry(
         `${API_BASE_URL}/api/vibe/claim/confirm`,
         {
@@ -368,13 +446,7 @@ export function useVibeApi() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            vibeId: params.vibeId,
-            claimerWallet: params.claimerWallet,
-            signedTransaction: txBase64,
-            blockhash: params.blockhash,
-            lastValidBlockHeight: params.lastValidBlockHeight,
-          }),
+          body: JSON.stringify(body),
         },
       );
 
@@ -389,13 +461,14 @@ export function useVibeApi() {
 
   /**
    * Check if a given X username has a pending or claimed vibe.
-   * Calls GET /api/vibe/pending/by-username?username=...
-   * Returns { hasPending, hasClaimed, vibeId, vibeUrl, mintAddress, solscanUrl } or null.
+   * Returns { hasPending, hasClaimed, pendingCount, pendingVibes, vibeId, vibeUrl, ... } or null.
    */
   const lookupVibeForUser = useCallback(
     async (username: string): Promise<{
       hasPending: boolean;
       hasClaimed: boolean;
+      pendingCount?: number;
+      pendingVibes?: Array<{ id: string; createdAt: string; maskedWallet?: string; vibeIndexForRecipient?: number }>;
       vibeId?: string;
       vibeUrl?: string;
       mintAddress?: string;

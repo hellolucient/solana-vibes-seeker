@@ -25,6 +25,7 @@ interface VibeRow {
   masked_wallet: string;
   created_at: string;
   vibe_number: number | null;
+  vibe_index_for_recipient: number | null;
   mint_address: string | null;
   metadata_uri: string | null;
   image_uri: string | null;
@@ -43,6 +44,7 @@ function rowToRecord(row: VibeRow): VibeRecord {
     maskedWallet: row.masked_wallet,
     createdAt: row.created_at,
     vibeNumber: row.vibe_number ?? undefined,
+    vibeIndexForRecipient: row.vibe_index_for_recipient ?? undefined,
     mintAddress: row.mint_address ?? undefined,
     metadataUri: row.metadata_uri ?? undefined,
     imageUri: row.image_uri ?? undefined,
@@ -62,6 +64,7 @@ function recordToRow(record: Partial<VibeRecord>): Partial<VibeRow> {
   if (record.senderWallet !== undefined) row.sender_wallet = record.senderWallet;
   if (record.maskedWallet !== undefined) row.masked_wallet = record.maskedWallet;
   if (record.vibeNumber !== undefined) row.vibe_number = record.vibeNumber;
+  if (record.vibeIndexForRecipient !== undefined) row.vibe_index_for_recipient = record.vibeIndexForRecipient;
   if (record.mintAddress !== undefined) row.mint_address = record.mintAddress;
   if (record.metadataUri !== undefined) row.metadata_uri = record.metadataUri;
   if (record.imageUri !== undefined) row.image_uri = record.imageUri;
@@ -72,7 +75,30 @@ function recordToRow(record: Partial<VibeRecord>): Partial<VibeRow> {
   return row;
 }
 
-// Check if a username has already been vibed
+// Check if this sender has already sent a vibe to this username (one vibe per wallet per @username)
+export async function getVibeBySenderAndUsername(
+  senderWallet: string,
+  username: string
+): Promise<VibeRecord | null> {
+  const normalizedUsername = username.replace(/^@/, "").toLowerCase();
+
+  const { data, error } = await supabase
+    .from("vibes")
+    .select()
+    .eq("sender_wallet", senderWallet)
+    .ilike("target_username", normalizedUsername)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[Supabase] getVibeBySenderAndUsername error:", error);
+    return null;
+  }
+
+  return data ? rowToRecord(data as VibeRow) : null;
+}
+
+// Check if a username has already been vibed (any sender) — kept for backward compat / analytics
 export async function getVibeByUsername(username: string): Promise<VibeRecord | null> {
   const normalizedUsername = username.replace(/^@/, "").toLowerCase();
   
@@ -93,6 +119,45 @@ export async function getVibeByUsername(username: string): Promise<VibeRecord | 
   }
 
   return rowToRecord(data as VibeRow);
+}
+
+/** Get all pending (unclaimed) vibes for a username, oldest first (for claim flow). */
+export async function getPendingVibesByUsername(username: string): Promise<VibeRecord[]> {
+  const normalizedUsername = username.replace(/^@/, "").toLowerCase();
+
+  const { data, error } = await supabase
+    .from("vibes")
+    .select()
+    .ilike("target_username", normalizedUsername)
+    .eq("claim_status", "pending")
+    .not("mint_address", "is", null)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[Supabase] getPendingVibesByUsername error:", error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => rowToRecord(row as VibeRow));
+}
+
+/** Atomically get next vibe index for a recipient (call at confirm time). */
+export async function getNextRecipientVibeIndex(targetUsername: string): Promise<number> {
+  const normalized = targetUsername.replace(/^@/, "").trim().toLowerCase();
+  const { data, error } = await supabase.rpc("get_next_recipient_vibe_index", {
+    p_username: normalized,
+  });
+
+  if (error) {
+    console.error("[Supabase] get_next_recipient_vibe_index error:", error);
+    throw new Error(`Failed to get next recipient vibe index: ${error.message}`);
+  }
+
+  const n = Number(data);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`Invalid next_index from get_next_recipient_vibe_index: ${data}`);
+  }
+  return n;
 }
 
 // Get a pending (unclaimed) vibe for a username, if any (most recent first)
@@ -248,6 +313,7 @@ export const vibeStore: IVibeStore = {
       sender_wallet: vibe.senderWallet,
       masked_wallet: vibe.maskedWallet,
       vibe_number: vibe.vibeNumber ?? null,
+      vibe_index_for_recipient: null, // Set at confirm time
       mint_address: vibe.mintAddress ?? null,
       metadata_uri: vibe.metadataUri ?? null,
       image_uri: vibe.imageUri ?? null,

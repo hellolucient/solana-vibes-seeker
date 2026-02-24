@@ -3,18 +3,18 @@
  *
  * Mobile-friendly version of /api/vibe/pending.
  * Accepts the X username as a query parameter instead of requiring auth cookies.
- * Used by the React Native app to check if the connected X user has a pending
- * or claimed vibe.
+ * Used by the React Native app to check if the connected X user has pending
+ * or claimed vibes.
  *
  * Returns:
- *   { hasPending: true, vibeId, vibeUrl, senderWallet }
- *   { hasClaimed: true, vibeId, vibeUrl, mintAddress, solscanUrl }
+ *   { hasPending: true, pendingCount: N, pendingVibes: [...], vibeId, vibeUrl, senderWallet }  (vibeId/vibeUrl/senderWallet = first pending for backward compat)
+ *   { hasClaimed: true, ... }
  *   { hasPending: false, hasClaimed: false }
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  getPendingVibeByUsername,
+  getPendingVibesByUsername,
   getClaimedVibeByUsername,
 } from "@/lib/storage/supabase";
 
@@ -40,19 +40,25 @@ export async function GET(req: NextRequest) {
   const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC ?? "";
   const cluster = rpc.toLowerCase().includes("mainnet") ? "mainnet" : "devnet";
 
-  // Check for pending (unclaimed) vibe
-  const pendingVibe = await getPendingVibeByUsername(username);
-  if (pendingVibe) {
+  // Check for pending (unclaimed) vibes — list all, oldest first
+  const pendingList = await getPendingVibesByUsername(username);
+  if (pendingList.length > 0) {
+    const first = pendingList[0];
     return NextResponse.json({
       hasPending: true,
-      hasClaimed: false,
-      vibeId: pendingVibe.id,
-      vibeUrl: `${baseUrl}/v/${pendingVibe.id}`,
+      pendingCount: pendingList.length,
+      pendingVibes: pendingList.map((v) => ({
+        id: v.id,
+        createdAt: v.createdAt,
+        maskedWallet: v.maskedWallet,
+        vibeIndexForRecipient: v.vibeIndexForRecipient,
+      })),
+      // Backward compat: first pending
+      vibeId: first.id,
+      vibeUrl: `${baseUrl}/v/${first.id}`,
       senderWallet:
-        pendingVibe.maskedWallet ??
-        pendingVibe.senderWallet.slice(0, 4) +
-          "…" +
-          pendingVibe.senderWallet.slice(-4),
+        first.maskedWallet ??
+        first.senderWallet.slice(0, 4) + "…" + first.senderWallet.slice(-4),
     });
   }
 

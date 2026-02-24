@@ -49,12 +49,16 @@ export function ClaimVibeScreen() {
   const navigation = useNavigation<ClaimVibeNavProp>();
   const {connected, publicKey, connect, disconnect, signTransaction} =
     useMobileWallet();
-  const {getVibeDetails, prepareClaim, confirmClaim} = useVibeApi();
+  const {getVibeDetails, prepareClaim, confirmClaim, lookupVibeForUser} = useVibeApi();
 
   const [claimState, setClaimState] = useState<ClaimState>('loading');
   const [vibeDetails, setVibeDetails] = useState<VibeDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [xUsername, setXUsername] = useState<string | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingVibes, setPendingVibes] = useState<Array<{ id: string }>>([]);
+  const [claimCount, setClaimCount] = useState(1);
+  const [claimFirstOnly, setClaimFirstOnly] = useState(false);
 
   const stepRef = useRef<string>('idle');
   const {vibeId} = route.params;
@@ -86,6 +90,18 @@ export function ClaimVibeScreen() {
     fetchDetails();
   }, [vibeId, getVibeDetails]);
 
+  // Fetch pending list for this user (for multi-claim)
+  useEffect(() => {
+    if (!vibeDetails?.targetUsername || claimState !== 'ready') return;
+    lookupVibeForUser(vibeDetails.targetUsername).then((data) => {
+      if (data?.hasPending && data.pendingCount != null && data.pendingVibes) {
+        setPendingCount(data.pendingCount);
+        setPendingVibes(data.pendingVibes.map((v) => ({ id: v.id })));
+        setClaimCount((c) => (c > data.pendingCount! ? data.pendingCount! : c));
+      }
+    });
+  }, [vibeDetails?.targetUsername, claimState, lookupVibeForUser]);
+
   const shortenedAddress = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
     : '';
@@ -108,35 +124,68 @@ export function ClaimVibeScreen() {
       return;
     }
 
+    const count = claimFirstOnly ? 1 : claimCount;
+    const vibeIds =
+      pendingVibes.length >= count
+        ? pendingVibes.slice(0, count).map((v) => v.id)
+        : [vibeDetails.id];
+
     setClaimState('preparing');
     stepRef.current = 'preparing';
     setError(null);
 
     try {
-      // Step 1: Prepare claim transaction
       const prepareResult = await prepareClaim({
-        vibeId: vibeDetails.id,
+        vibeIds: vibeIds.length > 1 ? vibeIds : undefined,
+        vibeId: vibeIds.length === 1 ? vibeIds[0] : undefined,
         claimerWallet: publicKey.toBase58(),
         xUsername,
       });
 
-      setClaimState('signing');
-      stepRef.current = 'signing';
-
-      // Step 2: Sign with wallet
-      const signedTx = await signTransaction(prepareResult.transaction);
-
-      setClaimState('confirming');
-      stepRef.current = 'confirming';
-
-      // Step 3: Confirm claim
-      await confirmClaim({
-        vibeId: vibeDetails.id,
-        claimerWallet: publicKey.toBase58(),
-        signedTransaction: signedTx,
-        blockhash: prepareResult.blockhash,
-        lastValidBlockHeight: prepareResult.lastValidBlockHeight,
-      });
+      if (prepareResult.transactions && prepareResult.transactions.length > 0) {
+        setClaimState('signing');
+        stepRef.current = 'signing';
+        const signedItems: Array<{
+          vibeId: string;
+          signedTransaction: import('@solana/web3.js').Transaction | import('@solana/web3.js').VersionedTransaction;
+          blockhash: string;
+          lastValidBlockHeight: number;
+        }> = [];
+        for (const t of prepareResult.transactions) {
+          const signed = await signTransaction(t.transaction);
+          signedItems.push({
+            vibeId: t.vibeId,
+            signedTransaction: signed,
+            blockhash: t.blockhash,
+            lastValidBlockHeight: t.lastValidBlockHeight,
+          });
+        }
+        setClaimState('confirming');
+        stepRef.current = 'confirming';
+        await confirmClaim({
+          claimerWallet: publicKey.toBase58(),
+          signedTransactions: signedItems,
+        });
+      } else if (
+        prepareResult.transaction &&
+        prepareResult.blockhash != null &&
+        prepareResult.lastValidBlockHeight != null
+      ) {
+        setClaimState('signing');
+        stepRef.current = 'signing';
+        const signedTx = await signTransaction(prepareResult.transaction);
+        setClaimState('confirming');
+        stepRef.current = 'confirming';
+        await confirmClaim({
+          claimerWallet: publicKey.toBase58(),
+          vibeId: vibeIds[0],
+          signedTransaction: signedTx,
+          blockhash: prepareResult.blockhash,
+          lastValidBlockHeight: prepareResult.lastValidBlockHeight,
+        });
+      } else {
+        throw new Error('Invalid prepare response');
+      }
 
       setClaimState('success');
     } catch (err) {
@@ -146,7 +195,18 @@ export function ClaimVibeScreen() {
       setError(`Error while ${stepRef.current}: ${message}`);
       setClaimState('ready');
     }
-  }, [connected, publicKey, vibeDetails, xUsername, prepareClaim, confirmClaim, signTransaction]);
+  }, [
+    connected,
+    publicKey,
+    vibeDetails,
+    xUsername,
+    claimCount,
+    claimFirstOnly,
+    pendingVibes,
+    prepareClaim,
+    confirmClaim,
+    signTransaction,
+  ]);
 
   const handleClose = () => {
     navigation.goBack();
@@ -285,6 +345,11 @@ export function ClaimVibeScreen() {
                 @{vibeDetails?.targetUsername}
               </Text>
             </Text>
+            {pendingCount > 1 && (
+              <Text style={styles.pendingCountText}>
+                You have {pendingCount} pending vibes to claim.
+              </Text>
+            )}
 
             {/* Connect wallet if needed */}
             {!connected ? (
@@ -311,7 +376,71 @@ export function ClaimVibeScreen() {
               </TouchableOpacity>
             )}
 
-            <Text style={styles.feeText}>Claim fee: ~0.001 SOL</Text>
+            <Text style={styles.feeText}>
+              ~0.001 SOL per vibe NFT
+              {claimCount > 1 ? ` · Total: ~${(0.001 * claimCount).toFixed(3)} SOL` : ''}
+            </Text>
+
+            {/* Multi-claim: how many to claim (oldest first) */}
+            {pendingCount > 1 && (
+              <View style={styles.claimCountSection}>
+                <Text style={styles.claimCountLabel}>
+                  How many to claim? (oldest first)
+                </Text>
+                <View style={styles.checkboxRow}>
+                  <TouchableOpacity
+                    style={styles.checkboxTouch}
+                    onPress={() => {
+                      setClaimFirstOnly(!claimFirstOnly);
+                      if (!claimFirstOnly) setClaimCount(1);
+                    }}>
+                    <View style={[styles.checkbox, claimFirstOnly && styles.checkboxChecked]}>
+                      {claimFirstOnly && <Text style={styles.checkboxCheck}>✓</Text>}
+                    </View>
+                    <Text style={styles.checkboxLabel}>
+                      Only claim the first vibe I received
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {!claimFirstOnly && (
+                  <View style={styles.countRow}>
+                    {[1, 2, 3].filter((n) => n <= pendingCount).map((n) => (
+                      <TouchableOpacity
+                        key={n}
+                        style={[
+                          styles.countBtn,
+                          claimCount === n && styles.countBtnActive,
+                        ]}
+                        onPress={() => setClaimCount(n)}>
+                        <Text
+                          style={[
+                            styles.countBtnText,
+                            claimCount === n && styles.countBtnTextActive,
+                          ]}>
+                          {n}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    {pendingCount > 3 && (
+                      <TouchableOpacity
+                        style={[
+                          styles.countBtn,
+                          claimCount === pendingCount && styles.countBtnActive,
+                        ]}
+                        onPress={() => setClaimCount(pendingCount)}>
+                        <Text
+                          style={[
+                            styles.countBtnText,
+                            claimCount === pendingCount && styles.countBtnTextActive,
+                          ]}>
+                          All ({pendingCount})
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Error */}
             {error && (
@@ -403,6 +532,12 @@ const styles = StyleSheet.create({
     color: '#14F195',
     fontWeight: '600',
   },
+  pendingCountText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: -8,
+    marginBottom: 12,
+  },
 
   // Claim button
   btnClaim: {
@@ -432,6 +567,73 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.25)',
     marginTop: 12,
+  },
+  claimCountSection: {
+    width: '100%',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  claimCountLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: 10,
+  },
+  checkboxRow: {
+    marginBottom: 12,
+  },
+  checkboxTouch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    borderColor: '#14F195',
+    backgroundColor: 'rgba(20,241,149,0.2)',
+  },
+  checkboxCheck: {
+    color: '#14F195',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    flex: 1,
+  },
+  countRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  countBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  countBtnActive: {
+    borderColor: 'rgba(20,241,149,0.5)',
+    backgroundColor: 'rgba(20,241,149,0.12)',
+  },
+  countBtnText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  countBtnTextActive: {
+    color: '#14F195',
+    fontWeight: '600',
   },
 
   // Links

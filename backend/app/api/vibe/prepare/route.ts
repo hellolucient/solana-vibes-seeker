@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { vibeStore, getVibeByUsername, recordUsernameCheck } from "@/lib/storage/supabase";
+import { vibeStore, getVibeBySenderAndUsername, recordUsernameCheck } from "@/lib/storage/supabase";
 import { maskWallet } from "@/lib/wallet";
 import { generateVibeId } from "@/lib/id";
 import { buildMintTransaction } from "@/lib/solana/mint-transaction";
@@ -51,52 +51,50 @@ export async function POST(req: NextRequest) {
   const placeholderUri = `${baseUrl}/api/vibe/${vibeId}/metadata`;
 
   try {
-    // Check if this username has already been vibed
-    const existingVibe = await getVibeByUsername(username);
+    // Check if this sender has already sent a vibe to this username (one per wallet per @username)
+    const existingVibe = await getVibeBySenderAndUsername(senderWallet, username);
     if (existingVibe) {
       // If it's a pending vibe, check if it was successfully minted
       if (existingVibe.claimStatus === "pending") {
-        // If it has metadataUri or imageUri, it was successfully minted - don't delete
-        // These are only set after successful mint confirmation
+        // If it has metadataUri or imageUri, it was successfully minted - don't allow another
         if (existingVibe.metadataUri || existingVibe.imageUri) {
-          console.log(`[vibe/prepare] Username @${username} already has successfully minted vibe by ${existingVibe.maskedWallet}`);
+          console.log(`[vibe/prepare] Sender already has a minted vibe to @${username}`);
           return NextResponse.json(
-            { 
+            {
               error: "already_vibed",
-              message: `@${username} already vibed`,
+              message: `You have already sent a vibe to @${username}`,
               senderWallet: existingVibe.maskedWallet,
             },
             { status: 409 }
           );
         }
-        
+
         // If it's older than 10 minutes and has no metadata/image, it's an incomplete mint
-        // This handles cases where user abandoned the flow or transaction timed out
         const createdAt = new Date(existingVibe.createdAt);
         const ageMinutes = (Date.now() - createdAt.getTime()) / (1000 * 60);
-        
+
         if (ageMinutes > 10) {
-          console.log(`[vibe/prepare] Cleaning up stale incomplete mint for @${username} (${ageMinutes.toFixed(1)} minutes old, no metadata/image)`);
+          console.log(`[vibe/prepare] Cleaning up stale incomplete mint to @${username} (${ageMinutes.toFixed(1)} minutes old)`);
           await vibeStore.delete(existingVibe.id);
           // Continue to create new vibe
         } else {
-          console.log(`[vibe/prepare] Username @${username} already has pending mint by ${existingVibe.maskedWallet} (${ageMinutes.toFixed(1)} minutes old)`);
+          console.log(`[vibe/prepare] Sender already has pending mint to @${username} (${ageMinutes.toFixed(1)} minutes old)`);
           return NextResponse.json(
-            { 
+            {
               error: "already_vibed",
-              message: `@${username} already vibed`,
+              message: `You have already sent a vibe to @${username}`,
               senderWallet: existingVibe.maskedWallet,
             },
             { status: 409 }
           );
         }
       } else {
-        // Already claimed - can't mint again
-        console.log(`[vibe/prepare] Username @${username} already vibed by ${existingVibe.maskedWallet}`);
+        // Already claimed - can't send another to same @username from this wallet
+        console.log(`[vibe/prepare] Sender already claimed a vibe to @${username}`);
         return NextResponse.json(
-          { 
+          {
             error: "already_vibed",
-            message: `@${username} already vibed`,
+            message: `You have already sent a vibe to @${username}`,
             senderWallet: existingVibe.maskedWallet,
           },
           { status: 409 }
