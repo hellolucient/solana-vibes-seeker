@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import {WebView, WebViewNavigation} from 'react-native-webview';
 
@@ -14,26 +15,72 @@ const BASE_URL = 'https://solana-vibes-seeker.vercel.app';
 const AUTH_URL = `${BASE_URL}/api/auth/x`;
 const ME_URL = `${BASE_URL}/api/auth/x/me`;
 
+/** Parse username from app callback URL (e.g. solanavibes://auth/x?username=foo) */
+function parseUsernameFromDeepLink(url: string): string | null {
+  const qIdx = url.indexOf('?');
+  if (qIdx === -1) return null;
+  const queryString = url.slice(qIdx + 1);
+  const params = queryString.split('&');
+  for (const param of params) {
+    const [key, ...rest] = param.split('=');
+    if (key === 'username' && rest.length > 0) {
+      return decodeURIComponent(rest.join('=').replace(/\+/g, ' '));
+    }
+  }
+  return null;
+}
+
 interface XAuthWebViewProps {
   visible: boolean;
   onClose: () => void;
   onSuccess: (username: string) => void;
+  /** When set, backend redirects here after auth; we intercept this URL and parse username (in-app flow). */
+  returnToDeepLink?: string;
 }
 
-export function XAuthWebView({visible, onClose, onSuccess}: XAuthWebViewProps) {
+export function XAuthWebView({visible, onClose, onSuccess, returnToDeepLink}: XAuthWebViewProps) {
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const hasChecked = useRef(false);
 
+  const authUrl = returnToDeepLink
+    ? `${AUTH_URL}?return_to=${encodeURIComponent(returnToDeepLink)}`
+    : AUTH_URL;
+
+  const handleShouldStartLoad = useCallback(
+    (event: {nativeEvent: {url: string}}) => {
+      const url = event.nativeEvent?.url || '';
+      if (returnToDeepLink && url.startsWith(returnToDeepLink)) {
+        const username = parseUsernameFromDeepLink(url);
+        if (username) {
+          onSuccess(username);
+          onClose();
+        }
+        return false;
+      }
+      return true;
+    },
+    [returnToDeepLink, onSuccess, onClose],
+  );
+
   const handleNavigationStateChange = useCallback(
     (navState: WebViewNavigation) => {
       const {url} = navState;
 
-      // After the OAuth flow completes, the backend redirects to the base URL.
-      // When we land back on the base domain (not the Twitter or API auth URL),
-      // inject JS to fetch /api/auth/x/me and get the username.
+      // App flow: backend redirects to deep link; intercept and parse username
+      if (returnToDeepLink && url.startsWith(returnToDeepLink)) {
+        const username = parseUsernameFromDeepLink(url);
+        if (username) {
+          onSuccess(username);
+          onClose();
+        }
+        return;
+      }
+
+      // Web flow: after OAuth, backend redirects to base URL; then call /me
       if (
+        !returnToDeepLink &&
         url.startsWith(BASE_URL) &&
         !url.includes('/api/auth/x') &&
         !url.includes('twitter.com') &&
@@ -60,7 +107,7 @@ export function XAuthWebView({visible, onClose, onSuccess}: XAuthWebViewProps) {
         webViewRef.current?.injectJavaScript(injectedJS);
       }
     },
-    [onSuccess],
+    [onSuccess, returnToDeepLink, onClose],
   );
 
   const handleMessage = useCallback(
@@ -129,9 +176,10 @@ export function XAuthWebView({visible, onClose, onSuccess}: XAuthWebViewProps) {
 
         <WebView
           ref={webViewRef}
-          source={{uri: AUTH_URL}}
+          source={{uri: authUrl}}
           style={styles.webview}
           onNavigationStateChange={handleNavigationStateChange}
+          onShouldStartLoadWithRequest={handleShouldStartLoad}
           onMessage={handleMessage}
           onLoadStart={() => setLoading(true)}
           onLoadEnd={() => setLoading(false)}
@@ -139,7 +187,11 @@ export function XAuthWebView({visible, onClose, onSuccess}: XAuthWebViewProps) {
           domStorageEnabled={true}
           thirdPartyCookiesEnabled={true}
           sharedCookiesEnabled={true}
-          userAgent="Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+          userAgent={
+            Platform.OS === 'ios'
+              ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+              : 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+          }
         />
       </SafeAreaView>
     </Modal>

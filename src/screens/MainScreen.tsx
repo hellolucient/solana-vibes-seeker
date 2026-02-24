@@ -23,6 +23,8 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useMobileWallet} from '../hooks/useMobileWallet';
 import {useVibeApi} from '../hooks/useVibeApi';
 import {VibeSpinner} from '../components/VibeSpinner';
+import {XSearchWebView} from '../components/XSearchWebView';
+import {XAuthWebView} from '../components/XAuthWebView';
 import type {RootStackParamList} from '../navigation/RootNavigator';
 
 const X_AUTH_BASE = 'https://solana-vibes-seeker.vercel.app/api/auth/x';
@@ -61,6 +63,8 @@ export function MainScreen() {
   const {prepareVibe, confirmVibe, lookupVibeForUser} = useVibeApi();
 
   const [targetUsername, setTargetUsername] = useState('@');
+  const [xSearchVisible, setXSearchVisible] = useState(false);
+  const [xConnectVisible, setXConnectVisible] = useState(false);
   const [sendState, setSendState] = useState<SendState>('idle');
   const [vibeResult, setVibeResult] = useState<{
     vibeId: string;
@@ -161,7 +165,7 @@ export function MainScreen() {
     return () => sub.remove();
   }, [setAndPersistXUsername]);
 
-  /** Toggle X connection: connect via in-app browser, or confirm + disconnect if already connected. */
+  /** Toggle X connection: open in-app WebView (same feel as Search on X), or confirm + disconnect if already connected. */
   const handleConnectX = useCallback(async () => {
     // Already connected → confirm disconnect
     if (xUsername) {
@@ -176,55 +180,27 @@ export function MainScreen() {
       return;
     }
 
-    // Clear any previous auth banner
     setXAuthBanner(null);
     xAuthInProgressRef.current = true;
-
-    // Open OAuth in Chrome Custom Tab (Android) / SFSafariViewController (iOS).
-    // These share cookies with the system browser, so if the user is already signed
-    // into X in Chrome (Android) or Safari (iOS), they won't be asked to log in again.
-    //
-    // We use open() rather than openAuth() because on Android with singleTask launch mode,
-    // the custom-scheme redirect intent routes to MainActivity instead of InAppBrowser's
-    // handler. So the callback is handled by the Linking event listener above.
-    const authUrl = `${X_AUTH_BASE}?return_to=${encodeURIComponent(X_AUTH_RETURN)}`;
-
-    try {
-      if (await InAppBrowser.isAvailable()) {
-        await InAppBrowser.open(authUrl, {
-          // Android Chrome Custom Tab styling
-          showTitle: false,
-          enableUrlBarHiding: true,
-          enableDefaultShare: false,
-          // Close the Custom Tab automatically when it redirects to our app scheme
-          forceCloseOnRedirection: true,
-          // Don't leave a ghost entry in Android recent apps
-          showInRecents: false,
-          // Presentation
-          animated: true,
-          modalPresentationStyle: 'fullScreen',
-          // iOS: share cookies with Safari
-          ephemeralWebSession: false,
-        });
-        // Browser was closed (either by us after callback, or by user manually).
-        // If auth succeeded, xAuthInProgressRef was already set to false by the
-        // deep link handler. If the user just closed the browser manually, show nothing.
-      } else {
-        // Fallback: open in system browser if InAppBrowser unavailable
-        Linking.openURL(authUrl);
-      }
-    } catch (err) {
-      console.error('[X Auth] Browser error:', err);
-      // Only show error if the deep link callback didn't already handle it
-      // (i.e. user wasn't already successfully authenticated)
-      if (xAuthInProgressRef.current) {
-        xAuthInProgressRef.current = false;
-        // Don't fall back to Linking.openURL — that creates a double-open mess.
-        // Just silently ignore; the user can tap Connect X again.
-        console.log('[X Auth] Browser closed/errored before callback. User can retry.');
-      }
-    }
+    setXConnectVisible(true);
   }, [xUsername, setAndPersistXUsername]);
+
+  const handleXConnectSuccess = useCallback(
+    (username: string) => {
+      xAuthInProgressRef.current = false;
+      setXConnectVisible(false);
+      setAndPersistXUsername(username);
+      setXAuthBanner({type: 'success', message: `Connected as @${username}`});
+    },
+    [setAndPersistXUsername],
+  );
+
+  const handleXConnectClose = useCallback(() => {
+    setXConnectVisible(false);
+    if (xAuthInProgressRef.current) {
+      xAuthInProgressRef.current = false;
+    }
+  }, []);
 
   const isLoading = sendState !== 'idle' && sendState !== 'success';
 
@@ -575,24 +551,45 @@ export function MainScreen() {
               {/* Send form */}
               <View style={styles.formSection}>
                 <Text style={styles.formLabel}>Send a vibe to</Text>
-                <TextInput
-                  style={styles.input}
-                  value={targetUsername}
-                  onChangeText={(text) => {
-                    // Ensure it always starts with '@'
-                    if (!text.startsWith('@')) {
-                      text = '@' + text;
-                    }
-                    // Remove any '@' symbols after the first character
-                    const cleaned = text.charAt(0) + text.slice(1).replace(/@/g, '');
-                    setTargetUsername(cleaned);
-                  }}
-                  placeholder="@username"
-                  placeholderTextColor="rgba(255,255,255,0.25)"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={styles.input}
+                    value={targetUsername}
+                    onChangeText={(text) => {
+                      // Ensure it always starts with '@'
+                      if (!text.startsWith('@')) {
+                        text = '@' + text;
+                      }
+                      // Remove any '@' symbols after the first character
+                      const cleaned = text.charAt(0) + text.slice(1).replace(/@/g, '');
+                      setTargetUsername(cleaned);
+                    }}
+                    placeholder="@username"
+                    placeholderTextColor="rgba(255,255,255,0.25)"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    style={styles.searchXBtn}
+                    onPress={() => setXSearchVisible(true)}
+                    activeOpacity={0.7}>
+                    <Text style={styles.searchXBtnText}>Search on X</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
+
+              <XSearchWebView
+                visible={xSearchVisible}
+                onClose={() => setXSearchVisible(false)}
+                onSelectUsername={(username) => setTargetUsername('@' + username)}
+              />
+
+              <XAuthWebView
+                visible={xConnectVisible}
+                onClose={handleXConnectClose}
+                onSuccess={handleXConnectSuccess}
+                returnToDeepLink={X_AUTH_RETURN}
+              />
 
               {/* X auth banner (success / error, auto-dismisses) */}
               {xAuthBanner && (
@@ -952,7 +949,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     marginBottom: 6,
   },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   input: {
+    flex: 1,
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 10,
     borderWidth: 1,
@@ -961,6 +964,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 15,
     color: '#ffffff',
+  },
+  searchXBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  searchXBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.7)',
   },
 
   // Send button

@@ -135,11 +135,16 @@ export function useMobileWallet() {
       }
     } catch (err: any) {
       console.error('Failed to connect wallet:', err);
-      setError(err?.message || 'Failed to connect wallet');
+      const message = err?.message || 'Failed to connect wallet';
+      const isCancelled = /cancelled|denied|user/i.test(message);
+      setError(message);
       setConnecting(false);
       Alert.alert(
         'Connection Failed',
-        err?.message || 'Failed to connect to wallet. Make sure you have a Solana wallet app installed.',
+        message +
+          (isCancelled
+            ? '\n\nOn an emulator, install a Solana wallet (e.g. Phantom) or test on a real device with a wallet installed.'
+            : ''),
       );
     }
   }, [cluster, connecting, connected, setConnected, setConnecting]);

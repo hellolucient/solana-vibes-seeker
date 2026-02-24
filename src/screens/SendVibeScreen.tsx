@@ -14,6 +14,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useMobileWallet} from '../hooks/useMobileWallet';
 import {WalletButton} from '../components/WalletButton';
+import {XSearchWebView} from '../components/XSearchWebView';
 import {useVibeApi} from '../hooks/useVibeApi';
 
 type SendState = 'idle' | 'preparing' | 'signing' | 'confirming' | 'success';
@@ -23,6 +24,7 @@ export function SendVibeScreen() {
   const {prepareVibe, confirmVibe} = useVibeApi();
 
   const [targetUsername, setTargetUsername] = useState('@');
+  const [xSearchVisible, setXSearchVisible] = useState(false);
   const [sendState, setSendState] = useState<SendState>('idle');
   const [vibeResult, setVibeResult] = useState<{
     id: string;
@@ -198,7 +200,20 @@ export function SendVibeScreen() {
               autoCorrect={false}
               editable={!isLoading}
             />
+            <TouchableOpacity
+              style={styles.searchXBtn}
+              onPress={() => setXSearchVisible(true)}
+              disabled={isLoading}
+              activeOpacity={0.7}>
+              <Text style={styles.searchXBtnText}>Search on X</Text>
+            </TouchableOpacity>
           </View>
+
+          <XSearchWebView
+            visible={xSearchVisible}
+            onClose={() => setXSearchVisible(false)}
+            onSelectUsername={(username) => setTargetUsername('@' + username)}
+          />
 
           {error && (
             <View style={styles.errorBox}>
@@ -299,6 +314,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#ffffff',
     paddingVertical: 16,
+  },
+  searchXBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  searchXBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#14F195',
   },
   errorBox: {
     backgroundColor: '#ff4444',
