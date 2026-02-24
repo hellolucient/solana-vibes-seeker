@@ -69,6 +69,10 @@ export function VibesToClaimScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backRow} activeOpacity={0.8}>
+          <Text style={styles.backArrow}>←</Text>
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color="#14F195" />
           <Text style={styles.loadingText}>Loading vibes to claim...</Text>
@@ -91,16 +95,30 @@ export function VibesToClaimScreen() {
       ) : pendingVibes.length === 0 ? (
         <Text style={styles.emptyText}>No pending vibes to claim.</Text>
       ) : (
-        <ScrollView
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}>
-          {pendingVibes.map((v, index) => (
-            <TouchableOpacity
-              key={v.id}
-              style={styles.card}
-              onPress={() => navigation.navigate('ClaimVibe', {vibeId: v.id})}
-              activeOpacity={0.8}>
+        <>
+          <TouchableOpacity
+            style={styles.claimAllBtn}
+            onPress={() =>
+              navigation.navigate('ClaimVibe', {
+                vibeId: pendingVibes[0].id,
+                claimAll: true,
+              })
+            }
+            activeOpacity={0.8}>
+            <Text style={styles.claimAllBtnText}>Claim all ({pendingVibes.length})</Text>
+          </TouchableOpacity>
+          <ScrollView
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={true}>
+            {pendingVibes.map((v, index) => (
+              <TouchableOpacity
+                key={v.id}
+                style={styles.card}
+                onPress={() =>
+                  navigation.navigate('ClaimVibe', {vibeId: v.id, singleOnly: true})
+                }
+                activeOpacity={0.8}>
               <View style={[styles.cardImage, styles.cardImagePlaceholder]} />
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle}>Vibe {index + 1} of {pendingVibes.length}</Text>
@@ -113,7 +131,8 @@ export function VibesToClaimScreen() {
               <Text style={styles.cardChevron}>→</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+          </ScrollView>
+        </>
       )}
     </SafeAreaView>
   );
@@ -175,12 +194,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: 24,
   },
+  claimAllBtn: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(20,241,149,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,241,149,0.4)',
+    alignItems: 'center',
+  },
+  claimAllBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#14F195',
+  },
   list: {
     flex: 1,
   },
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
+    flexGrow: 1,
   },
   card: {
     flexDirection: 'row',

@@ -11,7 +11,7 @@ import {VibesToClaimScreen} from '../screens/VibesToClaimScreen';
 // Types
 export type RootStackParamList = {
   Main: undefined;
-  ClaimVibe: {vibeId: string};
+  ClaimVibe: {vibeId: string; singleOnly?: boolean; claimAll?: boolean};
   Leaderboard: undefined;
   YourVibes: undefined;
   VibesToClaim: undefined;

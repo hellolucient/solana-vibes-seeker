@@ -22,6 +22,15 @@ import type {RootStackParamList} from '../navigation/RootNavigator';
 
 type ClaimVibeRouteProp = RouteProp<RootStackParamList, 'ClaimVibe'>;
 
+function formatTimestamp(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
+  } catch {
+    return iso;
+  }
+}
+
 type ClaimState =
   | 'loading'
   | 'ready'
@@ -40,6 +49,7 @@ interface VibeDetails {
   imageUrl: string;
   claimStatus: 'pending' | 'claimed';
   mintAddress?: string;
+  createdAt?: string;
 }
 
 type ClaimVibeNavProp = NativeStackNavigationProp<RootStackParamList, 'ClaimVibe'>;
@@ -68,7 +78,7 @@ export function ClaimVibeScreen() {
   } | null>(null);
 
   const stepRef = useRef<string>('idle');
-  const {vibeId} = route.params;
+  const {vibeId, singleOnly, claimAll} = route.params;
 
   // Load X username from storage
   useEffect(() => {
@@ -109,10 +119,18 @@ export function ClaimVibeScreen() {
           maskedWallet: v.maskedWallet,
         }));
         setPendingVibes(list);
-        setClaimCount((c) => (c > data.pendingCount! ? data.pendingCount! : c));
+        if (singleOnly) {
+          setClaimCount(1);
+        } else {
+          setClaimCount((c) => (c > data.pendingCount! ? data.pendingCount! : c));
+          if (claimAll && data.pendingCount != null) {
+            setClaimCount(data.pendingCount);
+            setClaimFirstOnly(false);
+          }
+        }
       }
     });
-  }, [vibeDetails?.targetUsername, claimState, lookupVibeForUser, vibeId]);
+  }, [vibeDetails?.targetUsername, claimState, lookupVibeForUser, vibeId, claimAll, singleOnly]);
 
 
   const shortenedAddress = publicKey
@@ -137,9 +155,10 @@ export function ClaimVibeScreen() {
       return;
     }
 
-    const count = claimFirstOnly ? 1 : claimCount;
-    const vibeIds =
-      pendingVibes.length >= count
+    const count = singleOnly ? 1 : claimFirstOnly ? 1 : claimCount;
+    const vibeIds = singleOnly
+      ? [vibeId]
+      : pendingVibes.length >= count
         ? pendingVibes.slice(0, count).map((v) => v.id)
         : [vibeDetails.id];
 
@@ -225,6 +244,8 @@ export function ClaimVibeScreen() {
     claimCount,
     claimFirstOnly,
     pendingVibes,
+    singleOnly,
+    vibeId,
     prepareClaim,
     confirmClaim,
     signTransaction,
@@ -341,6 +362,14 @@ export function ClaimVibeScreen() {
               </Text>
             </Text>
           )}
+          {vibeDetails?.createdAt && (
+            <Text style={styles.terminalLine}>
+              {'> '}
+              <Text style={styles.terminalGreen}>
+                {formatTimestamp(vibeDetails.createdAt)}
+              </Text>
+            </Text>
+          )}
           <Text style={styles.terminalLine}>
             {'> '}
             <Text style={styles.terminalGreen}>
@@ -350,7 +379,7 @@ export function ClaimVibeScreen() {
         </View>
 
         {/* Claimed state — also when opening an already-claimed vibe from Your vibes */}
-        {claimState === 'success' || vibeDetails?.claimStatus === 'claimed' ? (
+        {claimState === 'success' || (vibeDetails && vibeDetails.claimStatus === 'claimed') ? (
           <View style={styles.claimedSection}>
             <View style={styles.claimedBadge}>
               <Text style={styles.claimedBadgeTitle}>✓ Claimed</Text>
@@ -379,14 +408,14 @@ export function ClaimVibeScreen() {
                 @{vibeDetails?.targetUsername}
               </Text>
             </Text>
-            {pendingCount > 1 && (
+            {!singleOnly && pendingCount > 1 && (
               <Text style={styles.pendingCountText}>
                 You have {pendingCount} pending vibes to claim.
               </Text>
             )}
 
-            {/* Show claim UI only when this vibe is not already claimed */}
-            {vibeDetails?.claimStatus !== 'claimed' && (
+            {/* Show claim UI only when loaded and this vibe is not already claimed */}
+            {vibeDetails && vibeDetails.claimStatus !== 'claimed' && (
               <>
                 {/* Connect wallet if needed */}
                 {!connected ? (
@@ -418,8 +447,8 @@ export function ClaimVibeScreen() {
                   {claimCount > 1 ? ` · Total: ~${(0.001 * claimCount).toFixed(3)} SOL` : ''}
                 </Text>
 
-                {/* Multi-claim: how many to claim (oldest first) */}
-                {pendingCount > 1 && (
+                {/* Multi-claim: how many to claim (oldest first) — hidden when opened from single card */}
+                {!singleOnly && pendingCount > 1 && (
                   <View style={styles.claimCountSection}>
                     <Text style={styles.claimCountLabel}>
                       How many to claim? (oldest first)

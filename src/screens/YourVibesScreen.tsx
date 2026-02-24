@@ -91,7 +91,7 @@ export function YourVibesScreen() {
         <ScrollView
           style={styles.list}
           contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={true}>
           {claimedVibes.map((v, index) => (
             <TouchableOpacity
               key={v.id}
@@ -187,6 +187,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
+    flexGrow: 1,
   },
   card: {
     flexDirection: 'row',
