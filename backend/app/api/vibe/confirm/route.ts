@@ -211,77 +211,88 @@ export async function POST(req: NextRequest) {
 
     console.log(`[vibe/confirm] Transaction confirmed: ${signature}`);
 
-    // Assign per-recipient vibe index (Option B: at confirm time, no gaps)
-    const vibeIndexForRecipient = await getNextRecipientVibeIndex(vibe.targetUsername);
-    await vibeStore.update(vibeId, { vibeIndexForRecipient });
-
-    // Step 4: Generate final image
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
     const timestamp = new Date().toISOString();
     const maskedWallet = maskWallet(vibe.senderWallet);
 
-    const imageBuffer = await generateVibeImageBuffer({
-      maskedWallet,
-      recipientHandle: vibe.targetUsername,
-      mintAddress: vibe.mintAddress,
-      timestamp,
-      vibeNumber: vibe.vibeNumber,
-      vibeIndexForRecipient,
-    });
-
-    console.log("[vibe/confirm] Image generated");
-
-    // Step 5: Create and upload metadata
-    const metadata = createVibeMetadata({
-      vibeId,
-      recipientHandle: vibe.targetUsername,
-      senderWallet: vibe.senderWallet,
-      maskedWallet,
-      mintAddress: vibe.mintAddress,
-      timestamp,
-      baseUrl,
-      vibeNumber: vibe.vibeNumber,
-      vibeIndexForRecipient,
-    });
-
-    const { imageUri, metadataUri } = await uploadVibeAssets({
-      vibeId,
-      imageBuffer,
-      metadata,
-      baseUrl,
-    });
-
-    console.log(`[vibe/confirm] Assets uploaded: ${imageUri}`);
-
-    // Step 6: Update NFT metadata on-chain (optional - may fail due to RPC lag)
+    // Everything after tx confirmation: do not delete the vibe on failure (NFT is already minted).
     try {
-      await updateVibeMetadata(vibe.mintAddress, metadataUri);
-      console.log("[vibe/confirm] NFT metadata updated on-chain");
-    } catch (updateErr) {
-      // Non-fatal: the placeholder URI still works
-      console.warn("[vibe/confirm] Could not update NFT metadata (non-fatal):", updateErr);
+      const vibeIndexForRecipient = await getNextRecipientVibeIndex(vibe.targetUsername);
+      await vibeStore.update(vibeId, { vibeIndexForRecipient });
+
+      const imageBuffer = await generateVibeImageBuffer({
+        maskedWallet,
+        recipientHandle: vibe.targetUsername,
+        mintAddress: vibe.mintAddress,
+        timestamp,
+        vibeNumber: vibe.vibeNumber,
+        vibeIndexForRecipient,
+      });
+
+      console.log("[vibe/confirm] Image generated");
+
+      const metadata = createVibeMetadata({
+        vibeId,
+        recipientHandle: vibe.targetUsername,
+        senderWallet: vibe.senderWallet,
+        maskedWallet,
+        mintAddress: vibe.mintAddress,
+        timestamp,
+        baseUrl,
+        vibeNumber: vibe.vibeNumber,
+        vibeIndexForRecipient,
+      });
+
+      const { imageUri, metadataUri } = await uploadVibeAssets({
+        vibeId,
+        imageBuffer,
+        metadata,
+        baseUrl,
+      });
+
+      console.log(`[vibe/confirm] Assets uploaded: ${imageUri}`);
+
+      try {
+        await updateVibeMetadata(vibe.mintAddress, metadataUri);
+        console.log("[vibe/confirm] NFT metadata updated on-chain");
+      } catch (updateErr) {
+        console.warn("[vibe/confirm] Could not update NFT metadata (non-fatal):", updateErr);
+      }
+
+      await vibeStore.update(vibeId, {
+        metadataUri,
+        imageUri,
+      });
+
+      const vibeUrl = `${baseUrl}/v/${vibeId}`;
+      console.log(`[vibe/confirm] Complete in ${Date.now() - start}ms`);
+
+      return NextResponse.json({
+        success: true,
+        vibeId,
+        vibeUrl,
+        mintAddress: vibe.mintAddress,
+        signature,
+      });
+    } catch (postMintErr) {
+      // NFT is already minted; do not delete the vibe. Client can retry via complete-metadata.
+      console.error("[vibe/confirm] Post-mint image/metadata failed:", postMintErr);
+      return NextResponse.json(
+        {
+          error: "metadata_upload_failed",
+          message:
+            postMintErr instanceof Error
+              ? postMintErr.message
+              : "Mint succeeded but image or metadata upload failed. You can retry from the app.",
+          vibeId,
+          mintAddress: vibe.mintAddress,
+        },
+        { status: 500 }
+      );
     }
-
-    // Step 7: Update vibe record
-    await vibeStore.update(vibeId, {
-      metadataUri,
-      imageUri,
-    });
-
-    const vibeUrl = `${baseUrl}/v/${vibeId}`;
-
-    console.log(`[vibe/confirm] Complete in ${Date.now() - start}ms`);
-
-    return NextResponse.json({
-      success: true,
-      vibeId,
-      vibeUrl,
-      mintAddress: vibe.mintAddress,
-      signature,
-    });
   } catch (e) {
     console.error("[vibe/confirm] Error:", e);
-    // Clean up the failed vibe record
+    // Only delete if we never confirmed the tx (vibe still has no on-chain mint)
     try {
       await vibeStore.delete(body.vibeId);
     } catch (deleteErr) {

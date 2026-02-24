@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useMobileWallet} from '../hooks/useMobileWallet';
-import {useVibeApi} from '../hooks/useVibeApi';
+import {useVibeApi, type ConfirmVibeError} from '../hooks/useVibeApi';
 import {VibeSpinner} from '../components/VibeSpinner';
 import {XSearchWebView} from '../components/XSearchWebView';
 import {XAuthWebView} from '../components/XAuthWebView';
@@ -60,7 +60,7 @@ export function MainScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {connected, connecting, publicKey, connect, disconnect, signTransaction} =
     useMobileWallet();
-  const {prepareVibe, confirmVibe, lookupVibeForUser} = useVibeApi();
+  const {prepareVibe, confirmVibe, completeMetadata, lookupVibeForUser} = useVibeApi();
 
   const [targetUsername, setTargetUsername] = useState('@');
   const [xSearchVisible, setXSearchVisible] = useState(false);
@@ -72,6 +72,8 @@ export function MainScreen() {
     mintAddress: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** When confirm returns metadata_upload_failed, we can retry via complete-metadata */
+  const [retryVibeId, setRetryVibeId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [xUsername, setXUsername] = useState<string | null>(null);
   // Track whether X auth is in progress so we can suppress stale errors
@@ -280,12 +282,42 @@ export function MainScreen() {
       });
     } catch (err) {
       console.error('Send vibe error:', err);
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong';
-      setError(`Error while ${stepRef.current}: ${message}`);
+      const vibeErr = err as ConfirmVibeError;
+      const isMetadataFailed =
+        vibeErr?.code === 'metadata_upload_failed' && vibeErr?.vibeId;
+      if (isMetadataFailed) {
+        setRetryVibeId(vibeErr.vibeId);
+        setError(
+          'Mint succeeded but saving the image failed. Tap Retry below to fix.',
+        );
+      } else {
+        const message =
+          err instanceof Error ? err.message : 'Something went wrong';
+        setError(`Error while ${stepRef.current}: ${message}`);
+      }
       setSendState('idle');
     }
   }, [connected, publicKey, targetUsername, prepareVibe, confirmVibe, signTransaction]);
+
+  const handleRetryMetadata = useCallback(async () => {
+    if (!retryVibeId) return;
+    setError(null);
+    setSendState('confirming');
+    try {
+      const result = await completeMetadata(retryVibeId);
+      setRetryVibeId(null);
+      setVibeResult({
+        vibeId: result.vibeId,
+        vibeUrl: result.vibeUrl,
+        mintAddress: result.mintAddress ?? '',
+      });
+      setSendState('success');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Retry failed';
+      setError(message);
+      setSendState('idle');
+    }
+  }, [retryVibeId, completeMetadata]);
 
   const handleCopyLink = useCallback(() => {
     if (!vibeResult?.vibeUrl) return;
@@ -358,19 +390,19 @@ export function MainScreen() {
     setSendState('idle');
     setVibeResult(null);
     setError(null);
+    setRetryVibeId(null);
     setCopied(false);
-    // Re-check vibe status when returning to home
     checkVibeStatus();
   }, [checkVibeStatus]);
 
   /** Pull-to-refresh handler */
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Reset to idle + re-check vibe status
     setTargetUsername('@');
     setSendState('idle');
     setVibeResult(null);
     setError(null);
+    setRetryVibeId(null);
     setCopied(false);
     await checkVibeStatus();
     setRefreshing(false);
@@ -661,10 +693,18 @@ export function MainScreen() {
                 </View>
               )}
 
-              {/* Error */}
+              {/* Error + optional Retry for metadata_upload_failed */}
               {error && (
                 <View style={styles.errorBox}>
                   <Text style={styles.errorText}>{error}</Text>
+                  {retryVibeId ? (
+                    <TouchableOpacity
+                      style={styles.retryMetadataBtn}
+                      onPress={handleRetryMetadata}
+                      activeOpacity={0.8}>
+                      <Text style={styles.retryMetadataBtnText}>Retry</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               )}
 
@@ -1141,6 +1181,21 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
     fontSize: 13,
     textAlign: 'center',
+  },
+  retryMetadataBtn: {
+    marginTop: 10,
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(20,241,149,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,241,149,0.5)',
+  },
+  retryMetadataBtnText: {
+    color: '#14F195',
+    fontSize: 14,
+    fontWeight: '600',
   },
 
 });

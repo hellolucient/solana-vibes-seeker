@@ -10,6 +10,13 @@ import {
 const API_BASE_URL =
   process.env.API_BASE_URL || 'https://solana-vibes-seeker.vercel.app';
 
+/** Error from confirm API that may include retry fields (e.g. metadata_upload_failed) */
+export type ConfirmVibeError = Error & {
+  code?: string;
+  vibeId?: string;
+  mintAddress?: string;
+};
+
 /**
  * Deserialize a transaction from a base64 string.
  * Handles both legacy and versioned (v0) transactions.
@@ -274,38 +281,81 @@ export function useVibeApi() {
   );
 
   /**
-   * Confirm vibe after signing
+   * Confirm vibe after signing.
+   * Uses a timeout (100s) so the UI does not spin forever if the backend hangs.
    */
   const confirmVibe = useCallback(
     async (params: ConfirmVibeParams): Promise<ConfirmVibeResult> => {
-      // Serialize the signed transaction, handling both legacy and versioned
       const txBase64 = serializeSignedTransaction(params.signedTransaction);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 100_000); // 100s
 
-      // Use fetchWithRetry because the app resumes from background after
-      // MWA wallet signing, and the network connection may be stale
-      const response = await fetchWithRetry(
-        `${API_BASE_URL}/api/vibe/confirm`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+      try {
+        const response = await fetchWithRetry(
+          `${API_BASE_URL}/api/vibe/confirm`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              vibeId: params.vibeId,
+              signedTransaction: txBase64,
+              blockhash: params.blockhash,
+              lastValidBlockHeight: params.lastValidBlockHeight,
+            }),
+            signal: controller.signal,
           },
-          body: JSON.stringify({
-            vibeId: params.vibeId,
-            signedTransaction: txBase64,
-            blockhash: params.blockhash,
-            lastValidBlockHeight: params.lastValidBlockHeight,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          await extractApiError(response, 'Failed to confirm vibe'),
         );
-      }
+        clearTimeout(timeoutId);
 
-      return response.json();
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          const message =
+            body?.message ||
+            body?.error ||
+            (typeof body?.error === 'string' ? body.error : 'Failed to confirm vibe');
+          const err: ConfirmVibeError = new Error(
+            typeof message === 'string' ? message : 'Failed to confirm vibe',
+          ) as ConfirmVibeError;
+          err.code = body?.error;
+          err.vibeId = body?.vibeId;
+          err.mintAddress = body?.mintAddress;
+          throw err;
+        }
+
+        return response.json();
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err instanceof Error && err.name === 'AbortError') {
+          throw new Error(
+            'Confirmation timed out. The mint may still have succeeded — check your wallet or try again.',
+          );
+        }
+        throw err;
+      }
+    },
+    [],
+  );
+
+  /**
+   * Retry completing metadata for a vibe that minted but had image/upload fail.
+   */
+  const completeMetadata = useCallback(
+    async (vibeId: string): Promise<{ vibeId: string; vibeUrl: string; mintAddress?: string }> => {
+      const response = await fetch(`${API_BASE_URL}/api/vibe/complete-metadata`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vibeId }),
+      });
+      if (!response.ok) {
+        const msg = await extractApiError(response, 'Failed to complete metadata');
+        throw new Error(msg);
+      }
+      const data = await response.json();
+      return {
+        vibeId: data.vibeId,
+        vibeUrl: data.vibeUrl,
+        mintAddress: data.mintAddress,
+      };
     },
     [],
   );
@@ -509,6 +559,7 @@ export function useVibeApi() {
   return {
     prepareVibe,
     confirmVibe,
+    completeMetadata,
     getVibeDetails,
     prepareClaim,
     confirmClaim,
