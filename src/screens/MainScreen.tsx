@@ -428,10 +428,12 @@ export function MainScreen() {
               </View>
               <VibeSpinner size={48} />
               <Text style={styles.mintingSubtext}>...vibing</Text>
-              {sendState === 'signing' && publicKey && (
+              {(sendState === 'preparing' || sendState === 'signing') && publicKey && (
                 <View style={styles.signingWalletHintBox}>
                   <Text style={styles.signingWalletHint}>
-                    Sign with {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)} in your wallet.
+                    {sendState === 'signing'
+                      ? `Sign with ${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)} in your wallet.`
+                      : 'When your wallet opens, sign with the same account.'}
                   </Text>
                   <Text style={styles.signingWalletHintSub}>Don&apos;t switch to another account.</Text>
                 </View>

@@ -9,8 +9,6 @@ import {
   Alert,
   ScrollView,
   Platform,
-  FlatList,
-  useWindowDimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, useNavigation} from '@react-navigation/native';
@@ -72,9 +70,6 @@ export function ClaimVibeScreen() {
 
   const stepRef = useRef<string>('idle');
   const {vibeId} = route.params;
-  const {width: winWidth} = useWindowDimensions();
-  const carouselCardWidth = Math.min(winWidth * 0.75, 280);
-  const carouselSnapInterval = carouselCardWidth + 12;
 
   // Load X username from storage
   useEffect(() => {
@@ -136,16 +131,6 @@ export function ClaimVibeScreen() {
       .catch((err) => console.warn('Failed to load pending vibe details:', err));
   }, [selectedPendingIndex, pendingVibes, getVibeDetails]);
 
-  const onViewableItemsChanged = useRef(
-    ({viewableItems}: {viewableItems: Array<{index: number | null}>}) => {
-      const idx = viewableItems[0]?.index;
-      if (typeof idx === 'number' && idx >= 0) setSelectedPendingIndex(idx);
-    },
-  ).current;
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 60,
-    minimumViewTime: 100,
-  }).current;
 
   const shortenedAddress = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
@@ -333,43 +318,41 @@ export function ClaimVibeScreen() {
           <Text style={styles.title}>solana_vibes</Text>
         </TouchableOpacity>
 
-        {/* Swipe to view all pending vibes (same image, different senders/details) */}
+        {/* List of pending vibes to claim (same style as View your vibes) — tap to select */}
         {pendingCount > 1 && pendingVibes.length > 0 && (
-          <View style={styles.carouselWrap}>
-            <Text style={styles.carouselHint}>Swipe to view each pending vibe</Text>
-            <FlatList
-              data={pendingVibes}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={carouselSnapInterval}
-              snapToAlignment="start"
-              decelerationRate="fast"
-              contentContainerStyle={styles.carouselContent}
-              onViewableItemsChanged={onViewableItemsChanged}
-              viewabilityConfig={viewabilityConfig}
-              renderItem={({item, index}) => (
-                <View style={[styles.carouselCard, {width: carouselCardWidth}]}>
-                  {vibeDetails?.imageUrl && (
-                    <Image
-                      source={{uri: vibeDetails.imageUrl}}
-                      style={styles.carouselCardImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <View style={styles.carouselCardOverlay}>
-                    <Text style={styles.carouselCardLabel}>
-                      Vibe {index + 1} of {pendingVibes.length}
+          <View style={styles.pendingListWrap}>
+            <Text style={styles.pendingListTitle}>Vibes to claim — tap one to view</Text>
+            {pendingVibes.map((item, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.pendingCard,
+                  selectedPendingIndex === index && styles.pendingCardSelected,
+                ]}
+                onPress={() => setSelectedPendingIndex(index)}
+                activeOpacity={0.8}>
+                {vibeDetails?.id === item.id && vibeDetails?.imageUrl ? (
+                  <Image
+                    source={{uri: vibeDetails.imageUrl}}
+                    style={styles.pendingCardImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.pendingCardImage, styles.pendingCardImagePlaceholder]} />
+                )}
+                <View style={styles.pendingCardBody}>
+                  <Text style={styles.pendingCardLabel}>
+                    Vibe {index + 1} of {pendingVibes.length}
+                  </Text>
+                  {item.maskedWallet && (
+                    <Text style={styles.pendingCardWallet} numberOfLines={1}>
+                      From {item.maskedWallet}
                     </Text>
-                    {item.maskedWallet && (
-                      <Text style={styles.carouselCardWallet} numberOfLines={1}>
-                        From {item.maskedWallet}
-                      </Text>
-                    )}
-                  </View>
+                  )}
                 </View>
-              )}
-            />
+                <Text style={styles.pendingCardChevron}>→</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 
@@ -612,49 +595,58 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  // Pending vibes carousel (swipe to view each)
-  carouselWrap: {
+  // Pending vibes list (same style as View your vibes)
+  pendingListWrap: {
     width: '100%',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  carouselHint: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
-    marginBottom: 8,
+  pendingListTitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    marginBottom: 12,
     textAlign: 'center',
   },
-  carouselContent: {
-    paddingHorizontal: 6,
-  },
-  carouselCard: {
-    marginRight: 12,
-    borderRadius: 8,
+  pendingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    marginBottom: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  pendingCardSelected: {
+    borderColor: 'rgba(20,241,149,0.4)',
+    backgroundColor: 'rgba(20,241,149,0.06)',
+  },
+  pendingCardImage: {
+    width: 72,
+    height: 72,
     backgroundColor: '#0a0a0a',
   },
-  carouselCardImage: {
-    width: '100%',
-    height: 120,
+  pendingCardImagePlaceholder: {
     backgroundColor: '#111',
   },
-  carouselCardOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+  pendingCardBody: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  carouselCardLabel: {
-    fontSize: 12,
+  pendingCardLabel: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#14F195',
+    color: '#fff',
   },
-  carouselCardWallet: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
+  pendingCardWallet: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 2,
+  },
+  pendingCardChevron: {
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.4)',
+    paddingRight: 16,
   },
 
   // Terminal info

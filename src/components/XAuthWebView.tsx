@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   Platform,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {WebView, WebViewNavigation} from 'react-native-webview';
 
 const BASE_URL = 'https://solana-vibes-seeker.vercel.app';
@@ -151,8 +151,8 @@ export function XAuthWebView({visible, onClose, onSuccess, returnToDeepLink}: XA
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
       statusBarTranslucent>
-      <SafeAreaView style={styles.container}>
-        {/* Native-style header — matches app, not browser chrome */}
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+        {/* Header below camera/notch — no text in safe area */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Connect X</Text>
           <Text style={styles.headerSubtitle}>Sign in with your X account</Text>

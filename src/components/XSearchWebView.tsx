@@ -1,4 +1,4 @@
-import React, {useRef, useState, useCallback} from 'react';
+import React, {useRef, useState, useCallback, useEffect} from 'react';
 import {
   Modal,
   View,
@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   Platform,
   Linking,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {WebView, WebViewNavigation} from 'react-native-webview';
 
 const X_SEARCH_URL = 'https://x.com/search';
@@ -93,6 +93,13 @@ export function XSearchWebView({
     setError('The in-app browser had a problem. You can open X in your regular browser instead.');
   }, []);
 
+  // X search page may not fire onLoadEnd (SPA); stop blocking after 4s so user can search
+  useEffect(() => {
+    if (!visible || !loading) return;
+    const t = setTimeout(() => setLoading(false), 4000);
+    return () => clearTimeout(t);
+  }, [visible, loading]);
+
   const openInBrowser = useCallback(() => {
     Linking.openURL(X_SEARCH_URL);
     onClose();
@@ -105,8 +112,8 @@ export function XSearchWebView({
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
       statusBarTranslucent>
-      <SafeAreaView style={styles.container}>
-        {/* Native-style header — matches app */}
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+        {/* Header below camera/notch */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Search on X</Text>
           <Text style={styles.headerSubtitle}>
@@ -135,11 +142,11 @@ export function XSearchWebView({
           </View>
         ) : (
           <>
-            {/* App-style loading: centered, no browser progress bar */}
+            {/* Non-blocking loading bar so WebView stays visible and usable */}
             {loading && (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator color="#14F195" size="large" />
-                <Text style={styles.loadingLabel}>Loading...</Text>
+              <View style={styles.loadingBar}>
+                <ActivityIndicator color="#14F195" size="small" />
+                <Text style={styles.loadingBarText}>Loading...</Text>
               </View>
             )}
             {visible && (
@@ -215,16 +222,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: 'rgba(255,255,255,0.6)',
   },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 10,
-    backgroundColor: '#050505',
+  loadingBar: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  loadingLabel: {
-    marginTop: 14,
-    fontSize: 14,
+  loadingBarText: {
+    fontSize: 13,
     color: 'rgba(255,255,255,0.5)',
   },
   webviewWrap: {
