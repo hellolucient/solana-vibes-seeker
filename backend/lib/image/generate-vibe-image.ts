@@ -142,7 +142,8 @@ async function generateFooterOverlay(
   });
   
   const png = resvg.render().asPng();
-  return sharp(png)
+  const buf = Buffer.isBuffer(png) ? png : Buffer.from(png);
+  return sharp(buf)
     .resize(width, height, { fit: "cover" })
     .png()
     .toBuffer();
@@ -213,8 +214,9 @@ async function generateCornerOverlay(
   });
   
   const png = resvg.render().asPng();
+  const buf = Buffer.isBuffer(png) ? png : Buffer.from(png);
   // Resize to exact dimensions so composite never exceeds base image
-  return sharp(png)
+  return sharp(buf)
     .resize(width, height, { fit: "cover" })
     .png()
     .toBuffer();
@@ -281,7 +283,8 @@ async function generateBinaryOverlay(width: number, height: number): Promise<Buf
   });
   
   const png = resvg.render().asPng();
-  return sharp(png)
+  const buf = Buffer.isBuffer(png) ? png : Buffer.from(png);
+  return sharp(buf)
     .resize(width, height, { fit: "cover" })
     .png()
     .toBuffer();
@@ -297,8 +300,8 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
   ensureOutputDir(outputPath);
   const t0 = Date.now();
 
-  const image = sharp(BASE_IMAGE_PATH);
-  const meta = await image.metadata();
+  // Get base dimensions from a dedicated read (don't reuse this instance for composite)
+  const meta = await sharp(BASE_IMAGE_PATH).metadata();
   const width = meta.width ?? 0;
   const height = meta.height ?? 0;
   if (!width || !height) throw new Error("Invalid base image dimensions");
@@ -388,7 +391,8 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
     });
   }
 
-  const outBuffer = await image
+  // Use a fresh sharp instance for composite (metadata() can leave pipeline in bad state)
+  const outBuffer = await sharp(BASE_IMAGE_PATH)
     .composite(composites)
     .resize(NFT_OUTPUT_SIZE, NFT_OUTPUT_SIZE, {
       fit: "contain",
@@ -414,8 +418,7 @@ export async function generateVibeImageBuffer(
   const { maskedWallet, recipientHandle, mintAddress, timestamp, vibeNumber, vibeIndexForRecipient } = options;
   const t0 = Date.now();
 
-  const image = sharp(BASE_IMAGE_PATH);
-  const meta = await image.metadata();
+  const meta = await sharp(BASE_IMAGE_PATH).metadata();
   const width = meta.width ?? 0;
   const height = meta.height ?? 0;
   if (!width || !height) throw new Error("Invalid base image dimensions");
@@ -505,7 +508,7 @@ export async function generateVibeImageBuffer(
     });
   }
 
-  const outBuffer = await image
+  const outBuffer = await sharp(BASE_IMAGE_PATH)
     .composite(compositesBuffer)
     .resize(NFT_OUTPUT_SIZE, NFT_OUTPUT_SIZE, {
       fit: "contain",
