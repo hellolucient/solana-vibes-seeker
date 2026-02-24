@@ -59,6 +59,11 @@ export function ClaimVibeScreen() {
   const [pendingVibes, setPendingVibes] = useState<Array<{ id: string }>>([]);
   const [claimCount, setClaimCount] = useState(1);
   const [claimFirstOnly, setClaimFirstOnly] = useState(false);
+  /** When signing multiple claims: { current: 1, total: 2 } for "Signing 1 of 2" */
+  const [signingProgress, setSigningProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
   const stepRef = useRef<string>('idle');
   const {vibeId} = route.params;
@@ -133,6 +138,7 @@ export function ClaimVibeScreen() {
     setClaimState('preparing');
     stepRef.current = 'preparing';
     setError(null);
+    setSigningProgress(null);
 
     try {
       const prepareResult = await prepareClaim({
@@ -143,6 +149,7 @@ export function ClaimVibeScreen() {
       });
 
       if (prepareResult.transactions && prepareResult.transactions.length > 0) {
+        const total = prepareResult.transactions.length;
         setClaimState('signing');
         stepRef.current = 'signing';
         const signedItems: Array<{
@@ -151,7 +158,9 @@ export function ClaimVibeScreen() {
           blockhash: string;
           lastValidBlockHeight: number;
         }> = [];
-        for (const t of prepareResult.transactions) {
+        for (let i = 0; i < prepareResult.transactions.length; i++) {
+          setSigningProgress({ current: i + 1, total });
+          const t = prepareResult.transactions[i];
           const signed = await signTransaction(t.transaction);
           signedItems.push({
             vibeId: t.vibeId,
@@ -160,6 +169,7 @@ export function ClaimVibeScreen() {
             lastValidBlockHeight: t.lastValidBlockHeight,
           });
         }
+        setSigningProgress(null);
         setClaimState('confirming');
         stepRef.current = 'confirming';
         await confirmClaim({
@@ -171,6 +181,7 @@ export function ClaimVibeScreen() {
         prepareResult.blockhash != null &&
         prepareResult.lastValidBlockHeight != null
       ) {
+        setSigningProgress(null); // single tx, no "1 of 1" needed
         setClaimState('signing');
         stepRef.current = 'signing';
         const signedTx = await signTransaction(prepareResult.transaction);
@@ -190,6 +201,7 @@ export function ClaimVibeScreen() {
       setClaimState('success');
     } catch (err) {
       console.error('Claim error:', err);
+      setSigningProgress(null);
       const message =
         err instanceof Error ? err.message : 'Something went wrong';
       setError(`Error while ${stepRef.current}: ${message}`);
@@ -226,7 +238,9 @@ export function ClaimVibeScreen() {
     claimState === 'preparing'
       ? 'Preparing claim...'
       : claimState === 'signing'
-      ? 'Waiting for signature...'
+      ? signingProgress && signingProgress.total > 1
+        ? `Signing ${signingProgress.current} of ${signingProgress.total}...`
+        : 'Waiting for signature...'
       : claimState === 'confirming'
       ? 'Confirming on Solana...'
       : '';

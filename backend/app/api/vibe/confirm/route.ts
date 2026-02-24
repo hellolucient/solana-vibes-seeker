@@ -64,10 +64,23 @@ export async function POST(req: NextRequest) {
 
     console.log(`[vibe/confirm] Processing vibe ${vibeId}, mint: ${vibe.mintAddress}`);
 
-    // Step 2: Deserialize and submit the transaction
+    // Step 2: Deserialize and verify the transaction
     const connection = new Connection(getRpcUrl(), "confirmed");
     const transactionBuffer = Buffer.from(signedTransaction, "base64");
     const transaction = VersionedTransaction.deserialize(transactionBuffer);
+
+    // Fee payer must match the wallet that prepared the vibe (avoids wrong-wallet signature failures)
+    const feePayerFromTx = transaction.message.staticAccountKeys[0]?.toString();
+    if (feePayerFromTx && feePayerFromTx !== vibe.senderWallet) {
+      console.warn(`[vibe/confirm] Fee payer mismatch: tx=${feePayerFromTx}, vibe.senderWallet=${vibe.senderWallet}`);
+      return NextResponse.json(
+        {
+          error: "wrong_wallet",
+          message: "This transaction was prepared for a different wallet. Please use the same wallet that is connected in the app when you sign.",
+        },
+        { status: 400 }
+      );
+    }
 
     // Verify transaction has signatures
     const signatures = transaction.signatures;

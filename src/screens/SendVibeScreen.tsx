@@ -226,6 +226,15 @@ export function SendVibeScreen() {
             <Text style={styles.costValue}>~0.006 SOL</Text>
           </View>
 
+          {sendState === 'signing' && publicKey && (
+            <View style={styles.signingReminder}>
+              <Text style={styles.signingReminderText}>
+                Sign with {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)} in your wallet.
+              </Text>
+              <Text style={styles.signingReminderSub}>Don&apos;t switch to another account.</Text>
+            </View>
+          )}
+
           <TouchableOpacity
             style={[
               styles.primaryButton,
@@ -244,8 +253,7 @@ export function SendVibeScreen() {
           </TouchableOpacity>
 
           <Text style={styles.disclaimer}>
-            Each X user can only receive one vibe. The recipient will need to
-            verify their X account to claim.
+            Use the same wallet that&apos;s connected above when you sign — don&apos;t switch accounts in your wallet app or the transaction will fail.
           </Text>
         </View>
       </KeyboardAvoidingView>
@@ -355,6 +363,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#14F195',
     fontWeight: '600',
+  },
+  signingReminder: {
+    backgroundColor: 'rgba(20,241,149,0.12)',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(20,241,149,0.3)',
+  },
+  signingReminderText: {
+    fontSize: 14,
+    color: '#14F195',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  signingReminderSub: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    marginTop: 4,
   },
   primaryButton: {
     backgroundColor: '#14F195',

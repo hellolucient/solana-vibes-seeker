@@ -422,6 +422,11 @@ export function MainScreen() {
               </View>
               <VibeSpinner size={48} />
               <Text style={styles.mintingSubtext}>...vibing</Text>
+              {sendState === 'signing' && publicKey && (
+                <Text style={styles.signingWalletHint}>
+                  Sign with {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)} in your wallet. Don&apos;t switch accounts.
+                </Text>
+              )}
             </View>
           ) : sendState === 'success' && vibeResult ? (
             /* ===== SUCCESS STATE ===== */
@@ -714,6 +719,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.3)',
     fontStyle: 'italic',
+  },
+  signingWalletHint: {
+    marginTop: 14,
+    fontSize: 13,
+    color: 'rgba(20,241,149,0.9)',
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
 
   // ===== SUCCESS STATE =====
