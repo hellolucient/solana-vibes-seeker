@@ -7,6 +7,7 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -80,7 +81,7 @@ export function YourVibesScreen() {
         <Text style={styles.backArrow}>←</Text>
         <Text style={styles.backText}>Back</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Your vibes</Text>
+      <Text style={styles.title}>your_vibes</Text>
       <Text style={styles.subtitle}>Tap one to view</Text>
 
       {error ? (
@@ -162,6 +163,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
     marginBottom: 4,
+    fontFamily: Platform.OS === 'android' ? 'monospace' : 'Menlo',
   },
   subtitle: {
     fontSize: 13,

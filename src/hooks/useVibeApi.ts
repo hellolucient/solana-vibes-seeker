@@ -468,7 +468,7 @@ export function useVibeApi() {
       hasPending: boolean;
       hasClaimed: boolean;
       pendingCount?: number;
-      pendingVibes?: Array<{ id: string; createdAt: string; maskedWallet?: string; vibeIndexForRecipient?: number }>;
+      pendingVibes?: Array<{ id: string; createdAt: string; maskedWallet?: string; vibeIndexForRecipient?: number; imageUrl?: string }>;
       claimedCount?: number;
       claimedVibes?: Array<{
         id: string;

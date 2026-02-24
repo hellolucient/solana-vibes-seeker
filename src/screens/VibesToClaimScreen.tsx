@@ -7,6 +7,7 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -42,13 +43,14 @@ export function VibesToClaimScreen() {
         }
         const result = await lookupVibeForUser(username);
         if (!cancelled && result?.hasPending && result.pendingVibes?.length) {
-          setPendingVibes(
-            result.pendingVibes.map((v) => ({
-              id: v.id,
-              createdAt: v.createdAt,
-              maskedWallet: v.maskedWallet,
-            })),
-          );
+        setPendingVibes(
+          result.pendingVibes.map((v) => ({
+            id: v.id,
+            createdAt: v.createdAt,
+            maskedWallet: v.maskedWallet,
+            imageUrl: v.imageUrl,
+          })),
+        );
         } else if (!cancelled) {
           setPendingVibes([]);
         }
@@ -87,7 +89,7 @@ export function VibesToClaimScreen() {
         <Text style={styles.backArrow}>←</Text>
         <Text style={styles.backText}>Back</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Vibes to claim</Text>
+      <Text style={styles.title}>vibes_to_claim</Text>
       <Text style={styles.subtitle}>Tap one to view and claim</Text>
 
       {error ? (
@@ -119,7 +121,11 @@ export function VibesToClaimScreen() {
                   navigation.navigate('ClaimVibe', {vibeId: v.id, singleOnly: true})
                 }
                 activeOpacity={0.8}>
-              <View style={[styles.cardImage, styles.cardImagePlaceholder]} />
+              {v.imageUrl ? (
+                <Image source={{uri: v.imageUrl}} style={styles.cardImage} resizeMode="cover" />
+              ) : (
+                <View style={[styles.cardImage, styles.cardImagePlaceholder]} />
+              )}
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle}>Vibe {index + 1} of {pendingVibes.length}</Text>
                 {v.maskedWallet && (
@@ -175,6 +181,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
     marginBottom: 4,
+    fontFamily: Platform.OS === 'android' ? 'monospace' : 'Menlo',
   },
   subtitle: {
     fontSize: 13,

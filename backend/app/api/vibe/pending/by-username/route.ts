@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
         createdAt: v.createdAt,
         maskedWallet: v.maskedWallet,
         vibeIndexForRecipient: v.vibeIndexForRecipient,
+        imageUrl: v.imageUri ?? undefined,
       })),
       // Backward compat: first pending
       vibeId: first.id,

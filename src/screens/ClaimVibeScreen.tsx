@@ -309,18 +309,33 @@ export function ClaimVibeScreen() {
     );
   }
 
+  const canGoBack = navigation.canGoBack();
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Title — tap to go home */}
-        <TouchableOpacity
-          onPress={handleGoHome}
-          activeOpacity={0.7}
-          hitSlop={{top: 12, bottom: 12, left: 24, right: 24}}>
-          <Text style={styles.title}>solana_vibes</Text>
-        </TouchableOpacity>
+        {/* Back arrow when opened from list; title taps to home */}
+        <View style={styles.headerRow}>
+          {canGoBack ? (
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={styles.backRow}
+              activeOpacity={0.8}
+              hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
+              <Text style={styles.backArrow}>←</Text>
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            onPress={handleGoHome}
+            activeOpacity={0.7}
+            hitSlop={{top: 12, bottom: 12, left: 24, right: 24}}
+            style={canGoBack ? styles.titleRight : styles.titleCenter}>
+            <Text style={styles.title}>solana_vibes</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* NFT Image */}
         {vibeDetails?.imageUrl && (
@@ -378,7 +393,7 @@ export function ClaimVibeScreen() {
           </Text>
         </View>
 
-        {/* Claimed state — also when opening an already-claimed vibe from Your vibes */}
+        {/* Claimed state — also when opening an already-claimed vibe from your_vibes */}
         {claimState === 'success' || (vibeDetails && vibeDetails.claimStatus === 'claimed') ? (
           <View style={styles.claimedSection}>
             <View style={styles.claimedBadge}>
@@ -549,16 +564,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Title — paddingVertical expands the actual tappable area
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backArrow: {
+    fontSize: 20,
+    color: '#14F195',
+    marginRight: 6,
+  },
+  backText: {
+    fontSize: 16,
+    color: '#14F195',
+  },
+  titleRight: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  titleCenter: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  // Title — squarish font like Vercel app
   title: {
     fontSize: 22,
     fontWeight: '300',
     letterSpacing: 1.5,
     color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
-    paddingVertical: 12,
     marginTop: 8,
     marginBottom: 4,
+    fontFamily: Platform.OS === 'android' ? 'monospace' : 'Menlo',
   },
 
   // NFT Image
