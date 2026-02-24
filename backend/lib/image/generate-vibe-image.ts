@@ -141,12 +141,17 @@ async function generateFooterOverlay(
     },
   });
   
-  return resvg.render().asPng();
+  const png = resvg.render().asPng();
+  return sharp(png)
+    .resize(width, height, { fit: "cover" })
+    .png()
+    .toBuffer();
 }
 
 /**
  * Generate subtle corner text overlay (top-left or top-right).
  * Uses Montserrat Black for handle (left) and JetBrains Mono for vibe number (right).
+ * Returns PNG buffer sized exactly to width x height for safe compositing.
  */
 async function generateCornerOverlay(
   width: number,
@@ -207,7 +212,12 @@ async function generateCornerOverlay(
     },
   });
   
-  return resvg.render().asPng();
+  const png = resvg.render().asPng();
+  // Resize to exact dimensions so composite never exceeds base image
+  return sharp(png)
+    .resize(width, height, { fit: "cover" })
+    .png()
+    .toBuffer();
 }
 
 /**
@@ -270,7 +280,11 @@ async function generateBinaryOverlay(width: number, height: number): Promise<Buf
     },
   });
   
-  return resvg.render().asPng();
+  const png = resvg.render().asPng();
+  return sharp(png)
+    .resize(width, height, { fit: "cover" })
+    .png()
+    .toBuffer();
 }
 
 /**
