@@ -5,12 +5,14 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {MainScreen} from '../screens/MainScreen';
 import {ClaimVibeScreen} from '../screens/ClaimVibeScreen';
 import {LeaderboardScreen} from '../screens/LeaderboardScreen';
+import {YourVibesScreen} from '../screens/YourVibesScreen';
 
 // Types
 export type RootStackParamList = {
   Main: undefined;
   ClaimVibe: {vibeId: string};
   Leaderboard: undefined;
+  YourVibes: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -24,6 +26,7 @@ export function RootNavigator() {
       }}>
       <Stack.Screen name="Main" component={MainScreen} />
       <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+      <Stack.Screen name="YourVibes" component={YourVibesScreen} />
       <Stack.Screen
         name="ClaimVibe"
         component={ClaimVibeScreen}

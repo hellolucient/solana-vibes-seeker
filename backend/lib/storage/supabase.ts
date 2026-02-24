@@ -204,6 +204,26 @@ export async function getClaimedVibeByUsername(username: string): Promise<VibeRe
   return data ? rowToRecord(data as VibeRow) : null;
 }
 
+/** Get all claimed vibes for a username (for "View your vibes" list). */
+export async function getClaimedVibesByUsername(username: string): Promise<VibeRecord[]> {
+  const normalizedUsername = username.replace(/^@/, "").toLowerCase();
+
+  const { data, error } = await supabase
+    .from("vibes")
+    .select()
+    .ilike("target_username", normalizedUsername)
+    .eq("claim_status", "claimed")
+    .not("mint_address", "is", null)
+    .order("claimed_at", { ascending: false, nullsFirst: false });
+
+  if (error) {
+    console.error("[Supabase] getClaimedVibesByUsername error:", error);
+    return [];
+  }
+
+  return (data || []).map((row) => rowToRecord(row as VibeRow));
+}
+
 /** Minimal row for leaderboard aggregation (vibes in last 7 days, minted only) */
 export interface LeaderboardWeekRow {
   sender_wallet: string;

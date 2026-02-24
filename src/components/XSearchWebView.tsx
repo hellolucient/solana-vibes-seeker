@@ -103,17 +103,20 @@ export function XSearchWebView({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={handleClose}>
+      onRequestClose={handleClose}
+      statusBarTranslucent>
       <SafeAreaView style={styles.container}>
+        {/* Native-style header — matches app */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Search on X</Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+          <Text style={styles.headerSubtitle}>
+            Find a user, then tap their profile to select
+          </Text>
+          <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={12}>
             <Text style={styles.closeBtnText}>✕</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.hint}>
-          Search for a user, then tap their profile to select
-        </Text>
+
         {error ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
@@ -132,31 +135,38 @@ export function XSearchWebView({
           </View>
         ) : (
           <>
+            {/* App-style loading: centered, no browser progress bar */}
             {loading && (
-              <View style={styles.loadingBar}>
-                <ActivityIndicator color="#14F195" size="small" />
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator color="#14F195" size="large" />
+                <Text style={styles.loadingLabel}>Loading...</Text>
               </View>
             )}
             {visible && (
-              <WebView
-                ref={webViewRef}
-                source={{uri: X_SEARCH_URL}}
-                style={styles.webview}
-                onNavigationStateChange={handleNavigationStateChange}
-                onLoadStart={() => setLoading(true)}
-                onLoadEnd={() => setLoading(false)}
-                onError={handleWebViewError}
-                onHttpError={handleWebViewError}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                thirdPartyCookiesEnabled={true}
-                sharedCookiesEnabled={true}
-                userAgent={
-                  Platform.OS === 'ios'
-                    ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-                    : 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
-                }
-              />
+              <View style={styles.webviewWrap}>
+                <WebView
+                  ref={webViewRef}
+                  source={{uri: X_SEARCH_URL}}
+                  style={styles.webview}
+                  onNavigationStateChange={handleNavigationStateChange}
+                  onLoadStart={() => setLoading(true)}
+                  onLoadEnd={() => setLoading(false)}
+                  onError={handleWebViewError}
+                  onHttpError={handleWebViewError}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  thirdPartyCookiesEnabled={true}
+                  sharedCookiesEnabled={true}
+                  scrollEnabled={true}
+                  showsVerticalScrollIndicator={false}
+                  overScrollMode="never"
+                  userAgent={
+                    Platform.OS === 'ios'
+                      ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+                      : 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+                  }
+                />
+              </View>
             )}
           </>
         )}
@@ -168,49 +178,62 @@ export function XSearchWebView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#050505',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '300',
+    letterSpacing: 1.2,
     color: '#ffffff',
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    marginTop: 4,
   },
   closeBtn: {
     position: 'absolute',
     right: 16,
-    top: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
-    fontSize: 16,
+    fontSize: 18,
     color: 'rgba(255,255,255,0.6)',
   },
-  hint: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
-    textAlign: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  loadingBar: {
-    paddingVertical: 8,
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+    backgroundColor: '#050505',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center',
+  },
+  loadingLabel: {
+    marginTop: 14,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  webviewWrap: {
+    flex: 1,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#0a0a0a',
   },
   webview: {
     flex: 1,

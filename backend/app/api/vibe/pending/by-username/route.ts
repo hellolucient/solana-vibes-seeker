@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getPendingVibesByUsername,
-  getClaimedVibeByUsername,
+  getClaimedVibesByUsername,
 } from "@/lib/storage/supabase";
 
 function getSolscanTokenUrl(
@@ -62,16 +62,29 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Check for already-claimed vibe
-  const claimedVibe = await getClaimedVibeByUsername(username);
-  if (claimedVibe?.mintAddress) {
+  // Check for already-claimed vibe(s)
+  const claimedList = await getClaimedVibesByUsername(username);
+  if (claimedList.length > 0) {
+    const first = claimedList[0];
     return NextResponse.json({
       hasPending: false,
       hasClaimed: true,
-      vibeId: claimedVibe.id,
-      vibeUrl: `${baseUrl}/v/${claimedVibe.id}`,
-      mintAddress: claimedVibe.mintAddress,
-      solscanUrl: getSolscanTokenUrl(claimedVibe.mintAddress, cluster),
+      claimedCount: claimedList.length,
+      claimedVibes: claimedList.map((v) => ({
+        id: v.id,
+        vibeUrl: `${baseUrl}/v/${v.id}`,
+        imageUrl: v.imageUri,
+        mintAddress: v.mintAddress,
+        solscanUrl: v.mintAddress ? getSolscanTokenUrl(v.mintAddress, cluster) : undefined,
+        createdAt: v.createdAt,
+        claimedAt: v.claimedAt,
+        maskedWallet: v.maskedWallet,
+      })),
+      // Backward compat: first claimed
+      vibeId: first.id,
+      vibeUrl: `${baseUrl}/v/${first.id}`,
+      mintAddress: first.mintAddress,
+      solscanUrl: first.mintAddress ? getSolscanTokenUrl(first.mintAddress, cluster) : undefined,
     });
   }
 

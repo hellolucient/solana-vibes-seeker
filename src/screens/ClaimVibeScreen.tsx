@@ -9,7 +9,8 @@ import {
   Alert,
   ScrollView,
   Platform,
-  Dimensions,
+  FlatList,
+  useWindowDimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, useNavigation} from '@react-navigation/native';
@@ -57,7 +58,10 @@ export function ClaimVibeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [xUsername, setXUsername] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
-  const [pendingVibes, setPendingVibes] = useState<Array<{ id: string }>>([]);
+  const [pendingVibes, setPendingVibes] = useState<
+    Array<{ id: string; createdAt?: string; maskedWallet?: string }>
+  >([]);
+  const [selectedPendingIndex, setSelectedPendingIndex] = useState(0);
   const [claimCount, setClaimCount] = useState(1);
   const [claimFirstOnly, setClaimFirstOnly] = useState(false);
   /** When signing multiple claims: { current: 1, total: 2 } for "Signing 1 of 2" */
@@ -68,6 +72,9 @@ export function ClaimVibeScreen() {
 
   const stepRef = useRef<string>('idle');
   const {vibeId} = route.params;
+  const {width: winWidth} = useWindowDimensions();
+  const carouselCardWidth = Math.min(winWidth * 0.75, 280);
+  const carouselSnapInterval = carouselCardWidth + 12;
 
   // Load X username from storage
   useEffect(() => {
@@ -102,11 +109,43 @@ export function ClaimVibeScreen() {
     lookupVibeForUser(vibeDetails.targetUsername).then((data) => {
       if (data?.hasPending && data.pendingCount != null && data.pendingVibes) {
         setPendingCount(data.pendingCount);
-        setPendingVibes(data.pendingVibes.map((v) => ({ id: v.id })));
+        const list = data.pendingVibes.map((v) => ({
+          id: v.id,
+          createdAt: v.createdAt,
+          maskedWallet: v.maskedWallet,
+        }));
+        setPendingVibes(list);
         setClaimCount((c) => (c > data.pendingCount! ? data.pendingCount! : c));
+        const idx = list.findIndex((v) => v.id === vibeId);
+        setSelectedPendingIndex(idx >= 0 ? idx : 0);
       }
     });
-  }, [vibeDetails?.targetUsername, claimState, lookupVibeForUser]);
+  }, [vibeDetails?.targetUsername, claimState, lookupVibeForUser, vibeId]);
+
+  // When user swipes to another pending vibe, load that vibe's details so main image + terminal update
+  useEffect(() => {
+    if (
+      pendingVibes.length === 0 ||
+      selectedPendingIndex < 0 ||
+      selectedPendingIndex >= pendingVibes.length
+    )
+      return;
+    const id = pendingVibes[selectedPendingIndex].id;
+    getVibeDetails(id)
+      .then(setVibeDetails)
+      .catch((err) => console.warn('Failed to load pending vibe details:', err));
+  }, [selectedPendingIndex, pendingVibes, getVibeDetails]);
+
+  const onViewableItemsChanged = useRef(
+    ({viewableItems}: {viewableItems: Array<{index: number | null}>}) => {
+      const idx = viewableItems[0]?.index;
+      if (typeof idx === 'number' && idx >= 0) setSelectedPendingIndex(idx);
+    },
+  ).current;
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+    minimumViewTime: 100,
+  }).current;
 
   const shortenedAddress = publicKey
     ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
@@ -283,22 +322,6 @@ export function ClaimVibeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Fixed signing banner: upper-middle so wallet popup doesn't hide it */}
-      {isProcessing && claimState === 'signing' && (
-        <View style={styles.signingOverlay} pointerEvents="none">
-          <View style={styles.signingBanner}>
-            <Text style={styles.signingBannerTitle}>
-              {signingProgress && signingProgress.total > 1
-                ? `Signing transaction ${signingProgress.current} of ${signingProgress.total}`
-                : 'Waiting for your signature'}
-            </Text>
-            <Text style={styles.signingBannerSub}>
-              Use the same wallet that&apos;s connected — don&apos;t switch accounts.
-            </Text>
-          </View>
-        </View>
-      )}
-
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
@@ -310,6 +333,46 @@ export function ClaimVibeScreen() {
           <Text style={styles.title}>solana_vibes</Text>
         </TouchableOpacity>
 
+        {/* Swipe to view all pending vibes (same image, different senders/details) */}
+        {pendingCount > 1 && pendingVibes.length > 0 && (
+          <View style={styles.carouselWrap}>
+            <Text style={styles.carouselHint}>Swipe to view each pending vibe</Text>
+            <FlatList
+              data={pendingVibes}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={carouselSnapInterval}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              contentContainerStyle={styles.carouselContent}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
+              renderItem={({item, index}) => (
+                <View style={[styles.carouselCard, {width: carouselCardWidth}]}>
+                  {vibeDetails?.imageUrl && (
+                    <Image
+                      source={{uri: vibeDetails.imageUrl}}
+                      style={styles.carouselCardImage}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <View style={styles.carouselCardOverlay}>
+                    <Text style={styles.carouselCardLabel}>
+                      Vibe {index + 1} of {pendingVibes.length}
+                    </Text>
+                    {item.maskedWallet && (
+                      <Text style={styles.carouselCardWallet} numberOfLines={1}>
+                        From {item.maskedWallet}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+            />
+          </View>
+        )}
+
         {/* NFT Image */}
         {vibeDetails?.imageUrl && (
           <Image
@@ -317,6 +380,20 @@ export function ClaimVibeScreen() {
             style={styles.nftImage}
             resizeMode="cover"
           />
+        )}
+
+        {/* Signing alert: between image and green text, compact so it doesn't cover the vibe */}
+        {isProcessing && claimState === 'signing' && (
+          <View style={styles.signingBannerInline}>
+            <Text style={styles.signingBannerTitleSmall}>
+              {signingProgress && signingProgress.total > 1
+                ? `Signing ${signingProgress.current} of ${signingProgress.total}`
+                : 'Waiting for signature'}
+            </Text>
+            <Text style={styles.signingBannerSubSmall}>
+              Use the same wallet — don&apos;t switch accounts.
+            </Text>
+          </View>
         )}
 
         {/* Terminal-style info */}
@@ -535,6 +612,51 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  // Pending vibes carousel (swipe to view each)
+  carouselWrap: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  carouselHint: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  carouselContent: {
+    paddingHorizontal: 6,
+  },
+  carouselCard: {
+    marginRight: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#0a0a0a',
+  },
+  carouselCardImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#111',
+  },
+  carouselCardOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  carouselCardLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#14F195',
+  },
+  carouselCardWallet: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
+  },
+
   // Terminal info
   terminalInfo: {
     width: '100%',
@@ -571,36 +693,27 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 12,
   },
-  signingOverlay: {
-    position: 'absolute',
-    top: Dimensions.get('window').height * 0.22,
-    left: 16,
-    right: 16,
-    zIndex: 1000,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signingBanner: {
+  signingBannerInline: {
     width: '100%',
-    maxWidth: 340,
-    backgroundColor: 'rgba(20,241,149,0.12)',
+    backgroundColor: 'rgba(20,241,149,0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(20,241,149,0.35)',
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    borderColor: 'rgba(20,241,149,0.3)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
     alignItems: 'center',
   },
-  signingBannerTitle: {
-    fontSize: 15,
+  signingBannerTitleSmall: {
+    fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.95)',
-    marginBottom: 4,
   },
-  signingBannerSub: {
-    fontSize: 13,
+  signingBannerSubSmall: {
+    fontSize: 11,
     color: 'rgba(20,241,149,0.9)',
     textAlign: 'center',
+    marginTop: 2,
   },
 
   // Claim button

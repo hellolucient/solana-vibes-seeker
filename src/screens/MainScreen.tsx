@@ -85,6 +85,8 @@ export function MainScreen() {
     vibeId: string;
     claimStatus: 'pending' | 'claimed';
     pendingCount?: number;
+    claimedCount?: number;
+    claimedVibes?: Array<{ id: string; vibeUrl?: string; imageUrl?: string; mintAddress?: string; solscanUrl?: string }>;
     mintAddress?: string;
     vibeUrl?: string;
     solscanUrl?: string;
@@ -332,6 +334,8 @@ export function MainScreen() {
           vibeId: result.vibeId ?? '',
           claimStatus: result.hasClaimed ? 'claimed' : 'pending',
           pendingCount: result.pendingCount,
+          claimedCount: result.claimedCount,
+          claimedVibes: result.claimedVibes,
           mintAddress: result.mintAddress,
           vibeUrl: result.vibeUrl,
           solscanUrl: result.solscanUrl,
@@ -496,12 +500,19 @@ export function MainScreen() {
                   {pendingVibe.claimStatus === 'claimed' ? (
                     <View style={styles.vibeBannerLinks}>
                       <TouchableOpacity
-                        onPress={() =>
-                          pendingVibe.vibeId &&
-                          navigation.navigate('ClaimVibe', {vibeId: pendingVibe.vibeId})
-                        }
+                        onPress={() => {
+                          const n = pendingVibe.claimedCount ?? 1;
+                          if (n > 1)
+                            navigation.navigate('YourVibes');
+                          else if (pendingVibe.vibeId)
+                            navigation.navigate('ClaimVibe', {vibeId: pendingVibe.vibeId});
+                        }}
                         activeOpacity={0.8}>
-                        <Text style={styles.vibeBannerLinkClaimed}>View your vibe →</Text>
+                        <Text style={styles.vibeBannerLinkClaimed}>
+                          {(pendingVibe.claimedCount ?? 1) > 1
+                            ? `View your vibes (${pendingVibe.claimedCount}) →`
+                            : 'View your vibe →'}
+                        </Text>
                       </TouchableOpacity>
                       {pendingVibe.solscanUrl ? (
                         <TouchableOpacity

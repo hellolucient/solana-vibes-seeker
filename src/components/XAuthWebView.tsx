@@ -149,12 +149,14 @@ export function XAuthWebView({visible, onClose, onSuccess, returnToDeepLink}: XA
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={handleClose}>
+      onRequestClose={handleClose}
+      statusBarTranslucent>
       <SafeAreaView style={styles.container}>
-        {/* Header bar */}
+        {/* Native-style header — matches app, not browser chrome */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Connect X</Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+          <Text style={styles.headerSubtitle}>Sign in with your X account</Text>
+          <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={12}>
             <Text style={styles.closeBtnText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -167,32 +169,39 @@ export function XAuthWebView({visible, onClose, onSuccess, returnToDeepLink}: XA
           </View>
         )}
 
-        {/* Loading indicator for initial page load */}
+        {/* App-style loading: centered, no browser progress bar */}
         {loading && !checking && (
-          <View style={styles.loadingBar}>
-            <ActivityIndicator color="#9F6AFF" size="small" />
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator color="#14F195" size="large" />
+            <Text style={styles.loadingLabel}>Connecting to X...</Text>
           </View>
         )}
 
-        <WebView
-          ref={webViewRef}
-          source={{uri: authUrl}}
-          style={styles.webview}
-          onNavigationStateChange={handleNavigationStateChange}
-          onShouldStartLoadWithRequest={handleShouldStartLoad}
-          onMessage={handleMessage}
-          onLoadStart={() => setLoading(true)}
-          onLoadEnd={() => setLoading(false)}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          thirdPartyCookiesEnabled={true}
-          sharedCookiesEnabled={true}
-          userAgent={
-            Platform.OS === 'ios'
-              ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-              : 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
-          }
-        />
+        {/* WebView in a card-like container so it feels in-app */}
+        <View style={styles.webviewWrap}>
+          <WebView
+            ref={webViewRef}
+            source={{uri: authUrl}}
+            style={styles.webview}
+            onNavigationStateChange={handleNavigationStateChange}
+            onShouldStartLoadWithRequest={handleShouldStartLoad}
+            onMessage={handleMessage}
+            onLoadStart={() => setLoading(true)}
+            onLoadEnd={() => setLoading(false)}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            thirdPartyCookiesEnabled={true}
+            sharedCookiesEnabled={true}
+            scrollEnabled={true}
+            showsVerticalScrollIndicator={false}
+            overScrollMode="never"
+            userAgent={
+              Platform.OS === 'ios'
+                ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+                : 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+            }
+          />
+        </View>
       </SafeAreaView>
     </Modal>
   );
@@ -201,57 +210,74 @@ export function XAuthWebView({visible, onClose, onSuccess, returnToDeepLink}: XA
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#050505',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '300',
+    letterSpacing: 1.2,
     color: '#ffffff',
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    marginTop: 4,
   },
   closeBtn: {
     position: 'absolute',
     right: 16,
-    top: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
-    fontSize: 16,
+    fontSize: 18,
     color: 'rgba(255,255,255,0.6)',
   },
-  loadingBar: {
-    position: 'absolute',
-    top: 56,
-    left: 0,
-    right: 0,
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
     zIndex: 10,
+    backgroundColor: '#050505',
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'center',
+  },
+  loadingLabel: {
+    marginTop: 14,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
   },
   checkingOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 20,
-    backgroundColor: 'rgba(10,10,10,0.9)',
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
   },
   checkingText: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.6)',
+    marginTop: 16,
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  webviewWrap: {
+    flex: 1,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#0a0a0a',
   },
   webview: {
     flex: 1,
