@@ -34,6 +34,9 @@ const SUBTLE_GRAY = "rgba(128, 128, 128, 0.25)"; // Subtle gray for corner text
 /** Standard NFT display size; many wallets (e.g. Phantom) show square and can crop non-square images. */
 export const NFT_OUTPUT_SIZE = 1080;
 
+/** Fixed dimensions for compositing so overlays never exceed base (avoids Vercel/Sharp errors). */
+const COMPOSITE_BASE_SIZE = NFT_OUTPUT_SIZE;
+
 // Cache the font data
 let fontData: Buffer | null = null;
 function getFontData(): Buffer {
@@ -300,11 +303,13 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
   ensureOutputDir(outputPath);
   const t0 = Date.now();
 
-  // Get base dimensions from a dedicated read (don't reuse this instance for composite)
-  const meta = await sharp(BASE_IMAGE_PATH).metadata();
-  const width = meta.width ?? 0;
-  const height = meta.height ?? 0;
-  if (!width || !height) throw new Error("Invalid base image dimensions");
+  // Normalize base to fixed size so overlay dimensions never exceed base (fixes Vercel Sharp error)
+  const width = COMPOSITE_BASE_SIZE;
+  const height = COMPOSITE_BASE_SIZE;
+  const baseBuffer = await sharp(BASE_IMAGE_PATH)
+    .resize(width, height, { fit: "contain", position: "center", background: { r: 0, g: 0, b: 0, alpha: 1 } })
+    .png()
+    .toBuffer();
 
   // Prepare text content
   const handle = recipientHandle.startsWith("@") ? recipientHandle : `@${recipientHandle}`;
@@ -327,7 +332,7 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
   const binaryHeight = (FONT_SIZE_BINARY + 2) * 3 + PADDING * 2;
   const cornerHeight = FONT_SIZE_CORNER + PADDING * 2;
 
-  // Generate overlays using satori
+  // Generate overlays using satori (all at most width x height)
   const overlayPromises: Promise<Buffer>[] = [
     generateFooterOverlay(width, footerHeight, footerLines),
     generateBinaryOverlay(width, binaryHeight),
@@ -391,14 +396,9 @@ export async function generateVibeImage(options: GenerateVibeImageOptions): Prom
     });
   }
 
-  // Use a fresh sharp instance for composite (metadata() can leave pipeline in bad state)
-  const outBuffer = await sharp(BASE_IMAGE_PATH)
+  // Composite onto normalized base (no final resize needed)
+  const outBuffer = await sharp(baseBuffer)
     .composite(composites)
-    .resize(NFT_OUTPUT_SIZE, NFT_OUTPUT_SIZE, {
-      fit: "contain",
-      position: "center",
-      background: { r: 0, g: 0, b: 0, alpha: 1 },
-    })
     .png()
     .toBuffer();
 
@@ -418,10 +418,12 @@ export async function generateVibeImageBuffer(
   const { maskedWallet, recipientHandle, mintAddress, timestamp, vibeNumber, vibeIndexForRecipient } = options;
   const t0 = Date.now();
 
-  const meta = await sharp(BASE_IMAGE_PATH).metadata();
-  const width = meta.width ?? 0;
-  const height = meta.height ?? 0;
-  if (!width || !height) throw new Error("Invalid base image dimensions");
+  const width = COMPOSITE_BASE_SIZE;
+  const height = COMPOSITE_BASE_SIZE;
+  const baseBuffer = await sharp(BASE_IMAGE_PATH)
+    .resize(width, height, { fit: "contain", position: "center", background: { r: 0, g: 0, b: 0, alpha: 1 } })
+    .png()
+    .toBuffer();
 
   // Prepare text content
   const handle = recipientHandle.startsWith("@") ? recipientHandle : `@${recipientHandle}`;
@@ -508,13 +510,8 @@ export async function generateVibeImageBuffer(
     });
   }
 
-  const outBuffer = await sharp(BASE_IMAGE_PATH)
+  const outBuffer = await sharp(baseBuffer)
     .composite(compositesBuffer)
-    .resize(NFT_OUTPUT_SIZE, NFT_OUTPUT_SIZE, {
-      fit: "contain",
-      position: "center",
-      background: { r: 0, g: 0, b: 0, alpha: 1 },
-    })
     .png()
     .toBuffer();
 
