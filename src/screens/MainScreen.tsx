@@ -84,6 +84,7 @@ export function MainScreen() {
   const [pendingVibe, setPendingVibe] = useState<{
     vibeId: string;
     claimStatus: 'pending' | 'claimed';
+    pendingCount?: number;
     mintAddress?: string;
     vibeUrl?: string;
     solscanUrl?: string;
@@ -330,6 +331,7 @@ export function MainScreen() {
         setPendingVibe({
           vibeId: result.vibeId ?? '',
           claimStatus: result.hasClaimed ? 'claimed' : 'pending',
+          pendingCount: result.pendingCount,
           mintAddress: result.mintAddress,
           vibeUrl: result.vibeUrl,
           solscanUrl: result.solscanUrl,
@@ -423,9 +425,12 @@ export function MainScreen() {
               <VibeSpinner size={48} />
               <Text style={styles.mintingSubtext}>...vibing</Text>
               {sendState === 'signing' && publicKey && (
-                <Text style={styles.signingWalletHint}>
-                  Sign with {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)} in your wallet. Don&apos;t switch accounts.
-                </Text>
+                <View style={styles.signingWalletHintBox}>
+                  <Text style={styles.signingWalletHint}>
+                    Sign with {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)} in your wallet.
+                  </Text>
+                  <Text style={styles.signingWalletHintSub}>Don&apos;t switch to another account.</Text>
+                </View>
               )}
             </View>
           ) : sendState === 'success' && vibeResult ? (
@@ -474,33 +479,53 @@ export function MainScreen() {
             <View style={styles.fullWidth}>
               {/* Pending incoming vibe banner */}
               {pendingVibe && (
-                <TouchableOpacity
+                <View
                   style={[
                     styles.vibeBanner,
                     pendingVibe.claimStatus === 'claimed'
                       ? styles.vibeBannerClaimed
                       : styles.vibeBannerPending,
-                  ]}
-                  onPress={() => {
-                    // Open Solscan for claimed vibes, or navigate to claim screen for pending ones
-                    if (pendingVibe.claimStatus === 'claimed' && pendingVibe.solscanUrl) {
-                      Linking.openURL(pendingVibe.solscanUrl);
-                    } else if (pendingVibe.vibeId) {
-                      navigation.navigate('ClaimVibe', {vibeId: pendingVibe.vibeId});
-                    }
-                  }}
-                  activeOpacity={0.8}>
+                  ]}>
                   <Text style={styles.vibeBannerText}>
                     {pendingVibe.claimStatus === 'claimed'
-                      ? "You've already been vibed"
-                      : "You've got a vibe waiting!"}
+                      ? "You've claimed your vibe"
+                      : (pendingVibe.pendingCount ?? 1) > 1
+                      ? `You have ${pendingVibe.pendingCount} vibes to claim`
+                      : "You have 1 vibe to claim"}
                   </Text>
-                  {pendingVibe.claimStatus === 'claimed' && pendingVibe.solscanUrl ? (
-                    <Text style={styles.vibeBannerLink}>View on Solscan →</Text>
-                  ) : pendingVibe.vibeUrl ? (
-                    <Text style={styles.vibeBannerLink}>Claim your vibe →</Text>
-                  ) : null}
-                </TouchableOpacity>
+                  {pendingVibe.claimStatus === 'claimed' ? (
+                    <View style={styles.vibeBannerLinks}>
+                      <TouchableOpacity
+                        onPress={() =>
+                          pendingVibe.vibeId &&
+                          navigation.navigate('ClaimVibe', {vibeId: pendingVibe.vibeId})
+                        }
+                        activeOpacity={0.8}>
+                        <Text style={styles.vibeBannerLinkClaimed}>View your vibe →</Text>
+                      </TouchableOpacity>
+                      {pendingVibe.solscanUrl ? (
+                        <TouchableOpacity
+                          onPress={() => Linking.openURL(pendingVibe.solscanUrl!)}
+                          activeOpacity={0.8}>
+                          <Text style={styles.vibeBannerLinkSecondary}>View on Solscan</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() =>
+                        pendingVibe.vibeId &&
+                        navigation.navigate('ClaimVibe', {vibeId: pendingVibe.vibeId})
+                      }
+                      activeOpacity={0.8}>
+                      <Text style={styles.vibeBannerLink}>
+                        {(pendingVibe.pendingCount ?? 1) > 1
+                          ? 'Claim your vibes →'
+                          : 'Claim your vibe →'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               )}
 
               {/* Connect Wallet — tap to connect, tap again to disconnect (with confirmation) */}
@@ -720,12 +745,28 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.3)',
     fontStyle: 'italic',
   },
+  signingWalletHintBox: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(20,241,149,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,241,149,0.3)',
+    borderRadius: 10,
+    alignItems: 'center',
+    maxWidth: '100%',
+  },
   signingWalletHint: {
-    marginTop: 14,
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.95)',
+    textAlign: 'center',
+  },
+  signingWalletHintSub: {
+    marginTop: 4,
     fontSize: 13,
     color: 'rgba(20,241,149,0.9)',
     textAlign: 'center',
-    paddingHorizontal: 16,
   },
 
   // ===== SUCCESS STATE =====
@@ -857,6 +898,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(0,212,255,0.7)',
     marginTop: 2,
+    textDecorationLine: 'underline',
+  },
+  vibeBannerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 6,
+  },
+  vibeBannerLinkClaimed: {
+    fontSize: 13,
+    color: 'rgba(20,241,149,0.9)',
+    textDecorationLine: 'underline',
+  },
+  vibeBannerLinkSecondary: {
+    fontSize: 12,
+    color: 'rgba(20,241,149,0.7)',
     textDecorationLine: 'underline',
   },
 

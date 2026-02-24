@@ -365,6 +365,20 @@ export function ClaimVibeScreen() {
               </Text>
             )}
 
+            {/* Visible "Signing 1 of N" and wallet reminder when signing */}
+            {isProcessing && claimState === 'signing' && (
+              <View style={styles.signingBanner}>
+                <Text style={styles.signingBannerTitle}>
+                  {signingProgress && signingProgress.total > 1
+                    ? `Signing transaction ${signingProgress.current} of ${signingProgress.total}`
+                    : 'Waiting for your signature'}
+                </Text>
+                <Text style={styles.signingBannerSub}>
+                  Use the same wallet that&apos;s connected — don&apos;t switch accounts.
+                </Text>
+              </View>
+            )}
+
             {/* Connect wallet if needed */}
             {!connected ? (
               <TouchableOpacity
@@ -551,6 +565,28 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     marginTop: -8,
     marginBottom: 12,
+  },
+  signingBanner: {
+    width: '100%',
+    backgroundColor: 'rgba(20,241,149,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(20,241,149,0.25)',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  signingBannerTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.95)',
+    marginBottom: 4,
+  },
+  signingBannerSub: {
+    fontSize: 13,
+    color: 'rgba(20,241,149,0.9)',
+    textAlign: 'center',
   },
 
   // Claim button
