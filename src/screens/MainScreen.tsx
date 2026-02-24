@@ -526,22 +526,19 @@ export function MainScreen() {
                     </View>
                   ) : (
                     <TouchableOpacity
-                      onPress={() =>
-                        pendingVibe.vibeId &&
-                        navigation.navigate('ClaimVibe', {vibeId: pendingVibe.vibeId})
-                      }
+                      onPress={() => navigation.navigate('VibesToClaim')}
                       activeOpacity={0.8}>
                       <Text style={styles.vibeBannerLink}>
                         {(pendingVibe.pendingCount ?? 1) > 1
-                          ? 'Claim your vibes →'
-                          : 'Claim your vibe →'}
+                          ? 'View your vibes to claim →'
+                          : 'View your vibe to claim →'}
                       </Text>
                     </TouchableOpacity>
                   )}
                 </View>
               )}
 
-              {/* Connect Wallet — tap to connect, tap again to disconnect (with confirmation) */}
+              {/* Connect Wallet — required first step */}
               <TouchableOpacity
                 style={[
                   styles.connectBtn,
@@ -570,56 +567,65 @@ export function MainScreen() {
                 )}
               </TouchableOpacity>
 
-              {/* Connect X — tap to connect, tap again to disconnect */}
-              <TouchableOpacity
-                style={[
-                  styles.connectXBtn,
-                  xUsername && styles.connectXBtnDone,
-                ]}
-                onPress={handleConnectX}
-                activeOpacity={0.8}>
-                <Text style={[styles.xIcon, xUsername && styles.xIconDone]}>
-                  𝕏
-                </Text>
-                {xUsername ? (
-                  <>
-                    <Text style={styles.connectXLabelDone}>@{xUsername}</Text>
-                    <Text style={styles.disconnectX}>Disconnect</Text>
-                  </>
-                ) : (
-                  <Text style={styles.connectXLabel}>Connect X</Text>
-                )}
-              </TouchableOpacity>
+              {!connected && (
+                <Text style={styles.walletFirstHint}>Connect your wallet to continue</Text>
+              )}
 
-              {/* Send form */}
-              <View style={styles.formSection}>
-                <Text style={styles.formLabel}>Send a vibe to</Text>
-                <View style={styles.inputRow}>
-                  <TextInput
-                    style={styles.input}
-                    value={targetUsername}
-                    onChangeText={(text) => {
-                      // Ensure it always starts with '@'
-                      if (!text.startsWith('@')) {
-                        text = '@' + text;
-                      }
-                      // Remove any '@' symbols after the first character
-                      const cleaned = text.charAt(0) + text.slice(1).replace(/@/g, '');
-                      setTargetUsername(cleaned);
-                    }}
-                    placeholder="@username"
-                    placeholderTextColor="rgba(255,255,255,0.25)"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+              {/* Connect X and Send form — only after wallet is connected */}
+              {connected && (
+                <>
+                  {/* Connect X — tap to connect, tap again to disconnect */}
                   <TouchableOpacity
-                    style={styles.searchXBtn}
-                    onPress={() => setXSearchVisible(true)}
-                    activeOpacity={0.7}>
-                    <Text style={styles.searchXBtnText}>Search on X</Text>
+                    style={[
+                      styles.connectXBtn,
+                      xUsername && styles.connectXBtnDone,
+                    ]}
+                    onPress={handleConnectX}
+                    activeOpacity={0.8}>
+                    <Text style={[styles.xIcon, xUsername && styles.xIconDone]}>
+                      𝕏
+                    </Text>
+                    {xUsername ? (
+                      <>
+                        <Text style={styles.connectXLabelDone}>@{xUsername}</Text>
+                        <Text style={styles.disconnectX}>Disconnect</Text>
+                      </>
+                    ) : (
+                      <Text style={styles.connectXLabel}>Connect X</Text>
+                    )}
                   </TouchableOpacity>
-                </View>
-              </View>
+
+                  {/* Send form */}
+                  <View style={styles.formSection}>
+                    <Text style={styles.formLabel}>Send a vibe to</Text>
+                    <View style={styles.inputRow}>
+                      <TextInput
+                        style={styles.input}
+                        value={targetUsername}
+                        onChangeText={(text) => {
+                          // Ensure it always starts with '@'
+                          if (!text.startsWith('@')) {
+                            text = '@' + text;
+                          }
+                          // Remove any '@' symbols after the first character
+                          const cleaned = text.charAt(0) + text.slice(1).replace(/@/g, '');
+                          setTargetUsername(cleaned);
+                        }}
+                        placeholder="@username"
+                        placeholderTextColor="rgba(255,255,255,0.25)"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      <TouchableOpacity
+                        style={styles.searchXBtn}
+                        onPress={() => setXSearchVisible(true)}
+                        activeOpacity={0.7}>
+                        <Text style={styles.searchXBtnText}>Search on X</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              )}
 
               <XSearchWebView
                 visible={xSearchVisible}
@@ -948,6 +954,13 @@ const styles = StyleSheet.create({
   connectBtnDone: {
     borderColor: 'rgba(20,241,149,0.3)',
     backgroundColor: 'rgba(20,241,149,0.06)',
+  },
+  walletFirstHint: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 8,
   },
   connectBtnLabel: {
     fontSize: 15,

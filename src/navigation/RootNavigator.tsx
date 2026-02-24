@@ -6,6 +6,7 @@ import {MainScreen} from '../screens/MainScreen';
 import {ClaimVibeScreen} from '../screens/ClaimVibeScreen';
 import {LeaderboardScreen} from '../screens/LeaderboardScreen';
 import {YourVibesScreen} from '../screens/YourVibesScreen';
+import {VibesToClaimScreen} from '../screens/VibesToClaimScreen';
 
 // Types
 export type RootStackParamList = {
@@ -13,6 +14,7 @@ export type RootStackParamList = {
   ClaimVibe: {vibeId: string};
   Leaderboard: undefined;
   YourVibes: undefined;
+  VibesToClaim: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -27,6 +29,7 @@ export function RootNavigator() {
       <Stack.Screen name="Main" component={MainScreen} />
       <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
       <Stack.Screen name="YourVibes" component={YourVibesScreen} />
+      <Stack.Screen name="VibesToClaim" component={VibesToClaimScreen} />
       <Stack.Screen
         name="ClaimVibe"
         component={ClaimVibeScreen}

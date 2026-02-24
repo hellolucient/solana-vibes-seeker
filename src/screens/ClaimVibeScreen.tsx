@@ -59,7 +59,6 @@ export function ClaimVibeScreen() {
   const [pendingVibes, setPendingVibes] = useState<
     Array<{ id: string; createdAt?: string; maskedWallet?: string }>
   >([]);
-  const [selectedPendingIndex, setSelectedPendingIndex] = useState(0);
   const [claimCount, setClaimCount] = useState(1);
   const [claimFirstOnly, setClaimFirstOnly] = useState(false);
   /** When signing multiple claims: { current: 1, total: 2 } for "Signing 1 of 2" */
@@ -111,25 +110,9 @@ export function ClaimVibeScreen() {
         }));
         setPendingVibes(list);
         setClaimCount((c) => (c > data.pendingCount! ? data.pendingCount! : c));
-        const idx = list.findIndex((v) => v.id === vibeId);
-        setSelectedPendingIndex(idx >= 0 ? idx : 0);
       }
     });
   }, [vibeDetails?.targetUsername, claimState, lookupVibeForUser, vibeId]);
-
-  // When user swipes to another pending vibe, load that vibe's details so main image + terminal update
-  useEffect(() => {
-    if (
-      pendingVibes.length === 0 ||
-      selectedPendingIndex < 0 ||
-      selectedPendingIndex >= pendingVibes.length
-    )
-      return;
-    const id = pendingVibes[selectedPendingIndex].id;
-    getVibeDetails(id)
-      .then(setVibeDetails)
-      .catch((err) => console.warn('Failed to load pending vibe details:', err));
-  }, [selectedPendingIndex, pendingVibes, getVibeDetails]);
 
 
   const shortenedAddress = publicKey
@@ -318,44 +301,6 @@ export function ClaimVibeScreen() {
           <Text style={styles.title}>solana_vibes</Text>
         </TouchableOpacity>
 
-        {/* List of pending vibes to claim (same style as View your vibes) — tap to select */}
-        {pendingCount > 1 && pendingVibes.length > 0 && (
-          <View style={styles.pendingListWrap}>
-            <Text style={styles.pendingListTitle}>Vibes to claim — tap one to view</Text>
-            {pendingVibes.map((item, index) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.pendingCard,
-                  selectedPendingIndex === index && styles.pendingCardSelected,
-                ]}
-                onPress={() => setSelectedPendingIndex(index)}
-                activeOpacity={0.8}>
-                {vibeDetails?.id === item.id && vibeDetails?.imageUrl ? (
-                  <Image
-                    source={{uri: vibeDetails.imageUrl}}
-                    style={styles.pendingCardImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={[styles.pendingCardImage, styles.pendingCardImagePlaceholder]} />
-                )}
-                <View style={styles.pendingCardBody}>
-                  <Text style={styles.pendingCardLabel}>
-                    Vibe {index + 1} of {pendingVibes.length}
-                  </Text>
-                  {item.maskedWallet && (
-                    <Text style={styles.pendingCardWallet} numberOfLines={1}>
-                      From {item.maskedWallet}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.pendingCardChevron}>→</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
         {/* NFT Image */}
         {vibeDetails?.imageUrl && (
           <Image
@@ -365,16 +310,12 @@ export function ClaimVibeScreen() {
           />
         )}
 
-        {/* Signing alert: between image and green text, compact so it doesn't cover the vibe */}
-        {isProcessing && claimState === 'signing' && (
+        {/* Wallet alert only during prepare — not during signing (avoids flicker when signing is quick) */}
+        {isProcessing && claimState === 'preparing' && (
           <View style={styles.signingBannerInline}>
-            <Text style={styles.signingBannerTitleSmall}>
-              {signingProgress && signingProgress.total > 1
-                ? `Signing ${signingProgress.current} of ${signingProgress.total}`
-                : 'Waiting for signature'}
-            </Text>
+            <Text style={styles.signingBannerTitleSmall}>Preparing your claim...</Text>
             <Text style={styles.signingBannerSubSmall}>
-              Use the same wallet — don&apos;t switch accounts.
+              When your wallet opens, sign with the same account — don&apos;t switch.
             </Text>
           </View>
         )}
@@ -408,8 +349,8 @@ export function ClaimVibeScreen() {
           </Text>
         </View>
 
-        {/* Claimed state */}
-        {claimState === 'success' ? (
+        {/* Claimed state — also when opening an already-claimed vibe from Your vibes */}
+        {claimState === 'success' || vibeDetails?.claimStatus === 'claimed' ? (
           <View style={styles.claimedSection}>
             <View style={styles.claimedBadge}>
               <Text style={styles.claimedBadgeTitle}>✓ Claimed</Text>
@@ -444,95 +385,100 @@ export function ClaimVibeScreen() {
               </Text>
             )}
 
-            {/* Connect wallet if needed */}
-            {!connected ? (
-              <TouchableOpacity
-                style={styles.btnClaim}
-                onPress={handleConnect}
-                activeOpacity={0.8}>
-                <Text style={styles.btnClaimText}>Connect wallet to claim</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.btnClaim, isProcessing && styles.btnClaimProcessing]}
-                onPress={handleClaim}
-                disabled={isProcessing}
-                activeOpacity={0.8}>
-                {isProcessing ? (
-                  <View style={styles.loadingRow}>
-                    <VibeSpinner size={24} />
-                    <Text style={styles.btnClaimText}>{processingMessage}</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.btnClaimText}>confirm claim</Text>
-                )}
-              </TouchableOpacity>
-            )}
-
-            <Text style={styles.feeText}>
-              ~0.001 SOL per vibe NFT
-              {claimCount > 1 ? ` · Total: ~${(0.001 * claimCount).toFixed(3)} SOL` : ''}
-            </Text>
-
-            {/* Multi-claim: how many to claim (oldest first) */}
-            {pendingCount > 1 && (
-              <View style={styles.claimCountSection}>
-                <Text style={styles.claimCountLabel}>
-                  How many to claim? (oldest first)
-                </Text>
-                <View style={styles.checkboxRow}>
+            {/* Show claim UI only when this vibe is not already claimed */}
+            {vibeDetails?.claimStatus !== 'claimed' && (
+              <>
+                {/* Connect wallet if needed */}
+                {!connected ? (
                   <TouchableOpacity
-                    style={styles.checkboxTouch}
-                    onPress={() => {
-                      setClaimFirstOnly(!claimFirstOnly);
-                      if (!claimFirstOnly) setClaimCount(1);
-                    }}>
-                    <View style={[styles.checkbox, claimFirstOnly && styles.checkboxChecked]}>
-                      {claimFirstOnly && <Text style={styles.checkboxCheck}>✓</Text>}
-                    </View>
-                    <Text style={styles.checkboxLabel}>
-                      Only claim the first vibe I received
-                    </Text>
+                    style={styles.btnClaim}
+                    onPress={handleConnect}
+                    activeOpacity={0.8}>
+                    <Text style={styles.btnClaimText}>Connect wallet to claim</Text>
                   </TouchableOpacity>
-                </View>
-                {!claimFirstOnly && (
-                  <View style={styles.countRow}>
-                    {[1, 2, 3].filter((n) => n <= pendingCount).map((n) => (
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.btnClaim, isProcessing && styles.btnClaimProcessing]}
+                    onPress={handleClaim}
+                    disabled={isProcessing}
+                    activeOpacity={0.8}>
+                    {isProcessing ? (
+                      <View style={styles.loadingRow}>
+                        <VibeSpinner size={24} />
+                        <Text style={styles.btnClaimText}>{processingMessage}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.btnClaimText}>confirm claim</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                <Text style={styles.feeText}>
+                  ~0.001 SOL per vibe NFT
+                  {claimCount > 1 ? ` · Total: ~${(0.001 * claimCount).toFixed(3)} SOL` : ''}
+                </Text>
+
+                {/* Multi-claim: how many to claim (oldest first) */}
+                {pendingCount > 1 && (
+                  <View style={styles.claimCountSection}>
+                    <Text style={styles.claimCountLabel}>
+                      How many to claim? (oldest first)
+                    </Text>
+                    <View style={styles.checkboxRow}>
                       <TouchableOpacity
-                        key={n}
-                        style={[
-                          styles.countBtn,
-                          claimCount === n && styles.countBtnActive,
-                        ]}
-                        onPress={() => setClaimCount(n)}>
-                        <Text
-                          style={[
-                            styles.countBtnText,
-                            claimCount === n && styles.countBtnTextActive,
-                          ]}>
-                          {n}
+                        style={styles.checkboxTouch}
+                        onPress={() => {
+                          setClaimFirstOnly(!claimFirstOnly);
+                          if (!claimFirstOnly) setClaimCount(1);
+                        }}>
+                        <View style={[styles.checkbox, claimFirstOnly && styles.checkboxChecked]}>
+                          {claimFirstOnly && <Text style={styles.checkboxCheck}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkboxLabel}>
+                          Only claim the first vibe I received
                         </Text>
                       </TouchableOpacity>
-                    ))}
-                    {pendingCount > 3 && (
-                      <TouchableOpacity
-                        style={[
-                          styles.countBtn,
-                          claimCount === pendingCount && styles.countBtnActive,
-                        ]}
-                        onPress={() => setClaimCount(pendingCount)}>
-                        <Text
-                          style={[
-                            styles.countBtnText,
-                            claimCount === pendingCount && styles.countBtnTextActive,
-                          ]}>
-                          All ({pendingCount})
-                        </Text>
-                      </TouchableOpacity>
+                    </View>
+                    {!claimFirstOnly && (
+                      <View style={styles.countRow}>
+                        {[1, 2, 3].filter((n) => n <= pendingCount).map((n) => (
+                          <TouchableOpacity
+                            key={n}
+                            style={[
+                              styles.countBtn,
+                              claimCount === n && styles.countBtnActive,
+                            ]}
+                            onPress={() => setClaimCount(n)}>
+                            <Text
+                              style={[
+                                styles.countBtnText,
+                                claimCount === n && styles.countBtnTextActive,
+                              ]}>
+                              {n}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                        {pendingCount > 3 && (
+                          <TouchableOpacity
+                            style={[
+                              styles.countBtn,
+                              claimCount === pendingCount && styles.countBtnActive,
+                            ]}
+                            onPress={() => setClaimCount(pendingCount)}>
+                            <Text
+                              style={[
+                                styles.countBtnText,
+                                claimCount === pendingCount && styles.countBtnTextActive,
+                              ]}>
+                              All ({pendingCount})
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     )}
                   </View>
                 )}
-              </View>
+              </>
             )}
 
             {/* Error */}
@@ -593,60 +539,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#0a0a0a',
     marginBottom: 20,
-  },
-
-  // Pending vibes list (same style as View your vibes)
-  pendingListWrap: {
-    width: '100%',
-    marginBottom: 20,
-  },
-  pendingListTitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.45)',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  pendingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
-    marginBottom: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  pendingCardSelected: {
-    borderColor: 'rgba(20,241,149,0.4)',
-    backgroundColor: 'rgba(20,241,149,0.06)',
-  },
-  pendingCardImage: {
-    width: 72,
-    height: 72,
-    backgroundColor: '#0a0a0a',
-  },
-  pendingCardImagePlaceholder: {
-    backgroundColor: '#111',
-  },
-  pendingCardBody: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  pendingCardLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  pendingCardWallet: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
-    marginTop: 2,
-  },
-  pendingCardChevron: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.4)',
-    paddingRight: 16,
   },
 
   // Terminal info
