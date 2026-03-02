@@ -131,7 +131,11 @@ solana-vibes-seeker/
 
 ## Backend
 
-This app uses the existing [solana-vibes](https://github.com/hellolucient/solana-vibes) backend deployed at `solana-vibes.vercel.app`. The backend handles:
+This repo includes both the React Native app and the Next.js API backend (`backend/`).
+By default, the mobile app points to `https://solana-vibes-seeker.vercel.app` unless
+`API_BASE_URL` is overridden in app env vars.
+
+The backend handles:
 
 - NFT minting with Metaplex Core
 - Image generation
@@ -160,3 +164,7 @@ The app supports deep links for claim URLs. Clicking a claim link opens the app 
 ## License
 
 MIT
+
+## Additional Docs
+
+- Product overview: `docs/VIBES_OVERVIEW.md`

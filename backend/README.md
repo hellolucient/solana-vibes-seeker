@@ -14,9 +14,11 @@ Next.js API routes that power the Solana Vibes mobile app. Handles vibe minting,
 | POST | `/api/vibe/claim/prepare` | Prepare claim transaction |
 | POST | `/api/vibe/claim/confirm` | Submit signed claim transaction |
 | GET | `/api/vibe/pending/by-username?username=X` | Check pending/claimed vibes for X user |
+| GET | `/api/leaderboard?view=week|claimed|most_vibed` | Leaderboard data |
 | GET | `/api/auth/x` | Start X OAuth flow |
 | GET | `/api/auth/x/callback` | OAuth callback |
 | GET | `/api/auth/x/me` | Get authenticated X user |
+| GET | `/api/internal/supabase-keepalive` | Internal keepalive endpoint (cron + auth) |
 
 ## Structure
 
@@ -94,4 +96,25 @@ npx tsx scripts/get-authority-public-key.ts
 
 ## Deploy
 
-Currently deployed to Vercel via the `solana_vibes` webapp repo. The new `by-username` endpoint needs to be added there — see `app/api/vibe/pending/by-username/route.ts`.
+Deploy this `backend/` Next.js app to Vercel (or equivalent). Keep `NEXT_PUBLIC_APP_URL`
+aligned with your deployed backend domain so generated links and callbacks are correct.
+
+## Supabase keepalive cron
+
+To reduce idle/sleep behavior on Supabase, this backend includes a daily cron:
+
+- Endpoint: `/api/internal/supabase-keepalive`
+- Schedule: daily at `09:00 UTC` (defined in `vercel.json`)
+- Security: requires `CRON_SECRET` (checks `Authorization: Bearer <CRON_SECRET>`)
+
+Setup:
+
+1. Add `CRON_SECRET` in Vercel project environment variables.
+2. Ensure this backend's `vercel.json` is included in the deployed project.
+3. Deploy.
+
+You can manually test with:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://<your-backend-domain>/api/internal/supabase-keepalive
+```

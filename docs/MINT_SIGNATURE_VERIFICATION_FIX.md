@@ -2,10 +2,10 @@
 
 ## Symptom
 
-When sending a vibe (minting), the backend returns:
+When sending a vibe (minting), the confirm step may return:
 
 ```
-Error while confirming: Simulation failed.
+Simulation failed.
 Message: Transaction simulation failed: Transaction did not pass signature verification.
 ```
 
@@ -20,12 +20,20 @@ Message: Transaction simulation failed: Transaction did not pass signature verif
 
 3. **Wallet / signer mismatch** — The connected wallet must match the `senderWallet` passed to prepare. Rare if using the same session.
 
-## Fixes applied
+## Current implementation
 
-- **skipPreflight: true** on `sendRawTransaction` — bypasses the simulation step that was failing. The transaction is still validated on-chain; we detect failures via the confirmation polling loop.
-- **maxDuration: 90** — Vercel serverless timeout (default can be 15s) extended so confirmation polling can complete.
-- **90s polling** — Increased from 30s to 90s, with `searchTransactionHistory: true` for RPCs that index slowly.
-- **Priority fee** — Added `setComputeUnitPrice` (50k microlamports) and `setComputeUnitLimit` (200k CUs). Without a priority fee on mainnet, transactions get deprioritized and can sit for a long time; Phantom may also show "0 network fee" which can confuse users. The priority fee ensures the tx lands promptly.
+- **skipPreflight: false** on `sendRawTransaction` in `backend/app/api/vibe/confirm/route.ts`.
+- **maxDuration: 90** is enabled for the confirm route.
+- **90s polling** is used for confirmation with `searchTransactionHistory: true`.
+- **No explicit compute priority fee** is currently set in the mint tx builder.
+
+## Notes
+
+If signature verification errors reappear with specific RPC providers, the main options are:
+
+1. switch to a more reliable mainnet RPC,
+2. temporarily test with preflight disabled, or
+3. add compute unit price/limit for priority fees in the transaction builder.
 
 ## Network alignment
 
