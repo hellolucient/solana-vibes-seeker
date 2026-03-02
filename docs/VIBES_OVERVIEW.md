@@ -43,6 +43,36 @@ Platform micro-fees configured in backend:
 
 Users also pay normal Solana network costs (and mint account/rent costs on send).
 
+## What appears on the NFT image
+
+Each vibe image is generated as a square `1080x1080` PNG with fixed overlay text.
+
+- Top-left: recipient handle (for example `@trent`)
+- Top-right: global vibe number (for example `#123`)
+- Bottom terminal block:
+  - `> received solana_vibes`
+  - `> verified by wallet <masked sender wallet>`
+  - `> mint <masked mint address>`
+  - `<UTC timestamp>`
+  - `> for @<recipient>`
+- Bottom-right: recipient-specific ordinal vibe count (for example `3rd vibe`)
+
+## What appears in NFT metadata
+
+The metadata JSON includes:
+
+- `name`: `Vibe #<global_number> for @<recipient>` (when global number is available)
+- `description`: includes recipient handle and masked sender wallet
+- `external_url`: claim/detail page URL (`/v/{vibeId}`)
+- `image`: final uploaded image URL
+- `attributes`:
+  - `Vibe Number (global)` (example: `#123`)
+  - `Recipient` (example: `@trent`)
+  - `Sender Wallet` (masked)
+  - `Mint` (full mint address)
+  - `Created` (ISO timestamp)
+  - `Recipient Vibe` (example: `3rd vibe`, when available)
+
 ## Leaderboards: what each view means
 
 ### `week` (Vibers this week)
