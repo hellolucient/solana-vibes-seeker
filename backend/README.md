@@ -49,6 +49,8 @@ npm install
 npm run dev
 ```
 
+If you use the keepalive cron, set `CRON_SECRET` in both local `.env` and Vercel project env vars.
+
 ## Wallets
 
 ### Treasury Wallet
