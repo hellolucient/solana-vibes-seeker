@@ -1,11 +1,49 @@
 import React, {useEffect, useState} from 'react';
-import {StatusBar, View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {
+  StatusBar,
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {NavigationContainer} from '@react-navigation/native';
 import {RootNavigator} from './navigation/RootNavigator';
 import {ConnectionProvider} from './providers/ConnectionProvider';
 import {linking} from './utils/linking';
 import {useWalletStore} from './stores/walletStore';
+
+const APP_FONT_FAMILY = Platform.OS === 'android' ? 'monospace' : 'Menlo';
+
+// Apply a single global app font for all Text/TextInput in React Native.
+const GlobalText = Text as typeof Text & {
+  __solanaVibesFontApplied?: boolean;
+  defaultProps?: {style?: unknown};
+};
+const GlobalTextInput = TextInput as typeof TextInput & {
+  __solanaVibesFontApplied?: boolean;
+  defaultProps?: {style?: unknown};
+};
+
+if (!GlobalText.__solanaVibesFontApplied) {
+  GlobalText.defaultProps = GlobalText.defaultProps || {};
+  GlobalText.defaultProps.style = [
+    {fontFamily: APP_FONT_FAMILY},
+    GlobalText.defaultProps.style,
+  ];
+  GlobalText.__solanaVibesFontApplied = true;
+}
+
+if (!GlobalTextInput.__solanaVibesFontApplied) {
+  GlobalTextInput.defaultProps = GlobalTextInput.defaultProps || {};
+  GlobalTextInput.defaultProps.style = [
+    {fontFamily: APP_FONT_FAMILY},
+    GlobalTextInput.defaultProps.style,
+  ];
+  GlobalTextInput.__solanaVibesFontApplied = true;
+}
 
 // Error boundary component — recoverable so users aren't stuck
 class ErrorBoundary extends React.Component<

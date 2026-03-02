@@ -5,7 +5,7 @@ import Link from "next/link";
 
 const API_BASE = "";
 
-type View = "week" | "claimed";
+type View = "week" | "claimed" | "most_vibed";
 
 interface WeekEntry {
   wallet: string;
@@ -20,9 +20,17 @@ interface ClaimedEntry {
   count: number;
 }
 
+interface MostVibedEntry {
+  username: string;
+  displayUsername: string;
+  count: number;
+  claimedCount: number;
+}
+
 type ApiResponse =
   | { view: "week"; entries: WeekEntry[] }
-  | { view: "claimed"; entries: ClaimedEntry[] };
+  | { view: "claimed"; entries: ClaimedEntry[] }
+  | { view: "most_vibed"; entries: MostVibedEntry[] };
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -182,6 +190,17 @@ export function LeaderboardClient() {
           >
             claimed_vibes - total
           </button>
+          <button
+            type="button"
+            onClick={() => setView("most_vibed")}
+            style={
+              view === "most_vibed"
+                ? { ...styles.toggleBtn, ...styles.toggleBtnActive }
+                : styles.toggleBtn
+            }
+          >
+            most_vibed - total
+          </button>
         </div>
 
         {loading ? (
@@ -239,6 +258,39 @@ export function LeaderboardClient() {
                     </div>
                     <span style={styles.listItemCount}>
                       {entry.count} {entry.count === 1 ? "claimed" : "claimed"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        ) : view === "most_vibed" && data?.view === "most_vibed" ? (
+          data.entries.length === 0 ? (
+            <p style={styles.empty}>No vibed usernames yet.</p>
+          ) : (
+            <div style={styles.listWrapper}>
+              <ul style={styles.list}>
+                {data.entries.map((entry, index) => (
+                  <li
+                    key={entry.username}
+                    style={
+                      index === data.entries.length - 1
+                        ? { ...styles.listItem, borderBottom: "none" }
+                        : styles.listItem
+                    }
+                  >
+                    <div>
+                      <div style={styles.listItemWallet}>
+                        {entry.displayUsername}
+                      </div>
+                      {entry.claimedCount > 0 && (
+                        <div style={styles.listItemSub}>
+                          {entry.claimedCount} claimed
+                        </div>
+                      )}
+                    </div>
+                    <span style={styles.listItemCount}>
+                      {entry.count} {entry.count === 1 ? "vibe" : "vibes"}
                     </span>
                   </li>
                 ))}

@@ -239,6 +239,13 @@ export interface LeaderboardClaimedRow {
   claimed_at: string | null;
 }
 
+/** Minimal row for most-vibed leaderboard aggregation (by recipient username). */
+export interface LeaderboardMostVibedRow {
+  target_username: string;
+  created_at: string;
+  claim_status: string;
+}
+
 /** Fetch all minted vibes from the last 7 days for leaderboard aggregation. */
 export async function getLeaderboardWeekRows(
   sinceIso: string
@@ -270,6 +277,21 @@ export async function getLeaderboardClaimedRows(): Promise<LeaderboardClaimedRow
     return [];
   }
   return (data ?? []) as LeaderboardClaimedRow[];
+}
+
+/** Fetch all minted vibes for leaderboard aggregation by recipient username. */
+export async function getLeaderboardMostVibedRows(): Promise<LeaderboardMostVibedRow[]> {
+  const { data, error } = await supabase
+    .from("vibes")
+    .select("target_username, created_at, claim_status")
+    .not("mint_address", "is", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[Supabase] getLeaderboardMostVibedRows error:", error);
+    return [];
+  }
+  return (data ?? []) as LeaderboardMostVibedRow[];
 }
 
 /**

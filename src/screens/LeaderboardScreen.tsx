@@ -16,7 +16,7 @@ import type {RootStackParamList} from '../navigation/RootNavigator';
 const API_BASE_URL =
   process.env.API_BASE_URL || 'https://solana-vibes-seeker.vercel.app';
 
-type ViewType = 'week' | 'claimed';
+type ViewType = 'week' | 'claimed' | 'most_vibed';
 
 interface WeekEntry {
   wallet: string;
@@ -31,9 +31,17 @@ interface ClaimedEntry {
   count: number;
 }
 
+interface MostVibedEntry {
+  username: string;
+  displayUsername: string;
+  count: number;
+  claimedCount: number;
+}
+
 type ApiResponse =
   | {view: 'week'; entries: WeekEntry[]}
-  | {view: 'claimed'; entries: ClaimedEntry[]};
+  | {view: 'claimed'; entries: ClaimedEntry[]}
+  | {view: 'most_vibed'; entries: MostVibedEntry[]};
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Leaderboard'>;
 
@@ -136,6 +144,42 @@ export function LeaderboardScreen() {
       );
     }
 
+    if (view === 'most_vibed' && data?.view === 'most_vibed') {
+      if (data.entries.length === 0) {
+        return <Text style={styles.empty}>No vibed usernames yet.</Text>;
+      }
+      return (
+        <View style={styles.listWrapper}>
+          <ScrollView
+            style={styles.listScroll}
+            showsVerticalScrollIndicator={false}>
+            {data.entries.map((entry, index) => (
+              <View
+                key={entry.username}
+                style={[
+                  styles.listItem,
+                  index === data.entries.length - 1 && styles.listItemLast,
+                ]}>
+                <View>
+                  <Text style={styles.listItemWallet}>
+                    {entry.displayUsername}
+                  </Text>
+                  {entry.claimedCount > 0 && (
+                    <Text style={styles.listItemSub}>
+                      {entry.claimedCount} claimed
+                    </Text>
+                  )}
+                </View>
+                <Text style={styles.listItemCount}>
+                  {entry.count} {entry.count === 1 ? 'vibe' : 'vibes'}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      );
+    }
+
     return null;
   };
 
@@ -188,6 +232,21 @@ export function LeaderboardScreen() {
                 view === 'claimed' && styles.toggleBtnTextActive,
               ]}>
               claimed_vibes - total
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.toggleBtn,
+              view === 'most_vibed' && styles.toggleBtnActive,
+            ]}
+            onPress={() => setView('most_vibed')}
+            activeOpacity={0.8}>
+            <Text
+              style={[
+                styles.toggleBtnText,
+                view === 'most_vibed' && styles.toggleBtnTextActive,
+              ]}>
+              most_vibed - total
             </Text>
           </TouchableOpacity>
         </View>
