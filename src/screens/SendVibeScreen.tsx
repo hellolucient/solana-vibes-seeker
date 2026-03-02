@@ -78,13 +78,7 @@ export function SendVibeScreen() {
     } catch (err) {
       console.error('Send vibe error:', err);
       const message = err instanceof Error ? err.message : 'Something went wrong';
-      // Add context about which step failed
-      const step = sendState === 'preparing'
-        ? 'preparing'
-        : sendState === 'signing'
-        ? 'signing'
-        : 'confirming';
-      setError(`Error while ${step}: ${message}`);
+      setError(message);
       setSendState('idle');
     }
   };

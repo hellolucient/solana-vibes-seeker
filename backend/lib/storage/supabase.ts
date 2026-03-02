@@ -224,7 +224,7 @@ export async function getClaimedVibesByUsername(username: string): Promise<VibeR
   return (data || []).map((row) => rowToRecord(row as VibeRow));
 }
 
-/** Minimal row for leaderboard aggregation (vibes in last 7 days, minted only) */
+/** Minimal row for weekly leaderboard aggregation (minted only). */
 export interface LeaderboardWeekRow {
   sender_wallet: string;
   masked_wallet: string;
@@ -246,16 +246,22 @@ export interface LeaderboardMostVibedRow {
   claim_status: string;
 }
 
-/** Fetch all minted vibes from the last 7 days for leaderboard aggregation. */
+/** Fetch all minted vibes in a time range for weekly leaderboard aggregation. */
 export async function getLeaderboardWeekRows(
-  sinceIso: string
+  sinceIso: string,
+  untilIso?: string
 ): Promise<LeaderboardWeekRow[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("vibes")
     .select("sender_wallet, masked_wallet, created_at, claim_status")
     .gte("created_at", sinceIso)
-    .not("mint_address", "is", null)
-    .order("created_at", { ascending: false });
+    .not("mint_address", "is", null);
+
+  if (untilIso) {
+    query = query.lt("created_at", untilIso);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) {
     console.error("[Supabase] getLeaderboardWeekRows error:", error);

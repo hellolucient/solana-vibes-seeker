@@ -29,8 +29,22 @@ export async function GET(req: NextRequest) {
   }
 
   if (view === "week") {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const rows = await getLeaderboardWeekRows(sevenDaysAgo);
+    // Week window is Monday 00:00:00 UTC through next Monday 00:00:00 UTC.
+    const now = new Date();
+    const nowUtcMidnight = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate()
+    );
+    const dayOfWeek = now.getUTCDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const weekStart = new Date(nowUtcMidnight - daysSinceMonday * 24 * 60 * 60 * 1000);
+    const nextWeekStart = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const rows = await getLeaderboardWeekRows(
+      weekStart.toISOString(),
+      nextWeekStart.toISOString()
+    );
 
     type Agg = { count: number; claimedCount: number; latestCreatedAt: string; maskedWallet: string };
     const bySender = new Map<string, Agg>();

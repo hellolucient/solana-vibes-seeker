@@ -242,6 +242,10 @@ export function MainScreen() {
       Alert.alert('Connect Wallet', 'Please connect your wallet first');
       return;
     }
+    if (!xUsername) {
+      Alert.alert('Connect X', 'Please connect your X account first');
+      return;
+    }
 
     const username = targetUsername.replace('@', '').trim();
     if (!username) {
@@ -293,11 +297,11 @@ export function MainScreen() {
       } else {
         const message =
           err instanceof Error ? err.message : 'Something went wrong';
-        setError(`Error while ${stepRef.current}: ${message}`);
+        setError(message);
       }
       setSendState('idle');
     }
-  }, [connected, publicKey, targetUsername, prepareVibe, confirmVibe, signTransaction]);
+  }, [connected, publicKey, xUsername, targetUsername, prepareVibe, confirmVibe, signTransaction]);
 
   const handleRetryMetadata = useCallback(async () => {
     if (!retryVibeId) return;
@@ -712,11 +716,11 @@ export function MainScreen() {
               <TouchableOpacity
                 style={[
                   styles.btnSend,
-                  (!connected || !targetUsername.replace('@', '').trim()) &&
+                  (!connected || !xUsername || !targetUsername.replace('@', '').trim()) &&
                     styles.btnSendDisabled,
                 ]}
                 onPress={handleSendVibe}
-                disabled={!connected || !targetUsername.replace('@', '').trim()}
+                disabled={!connected || !xUsername || !targetUsername.replace('@', '').trim()}
                 activeOpacity={0.8}>
                 <Text style={styles.btnSendLabel}>send vibe</Text>
               </TouchableOpacity>

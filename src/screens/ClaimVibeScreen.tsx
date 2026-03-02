@@ -409,7 +409,7 @@ export function ClaimVibeScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.btnSendOwn}
-                onPress={handleClose}>
+                onPress={handleGoHome}>
                 <Text style={styles.btnSendOwnText}>Send your own vibe</Text>
               </TouchableOpacity>
             </View>
