@@ -51,6 +51,7 @@ interface VibeDetails {
   mintAddress?: string;
   createdAt?: string;
   claimedAt?: string;
+  claimerWallet?: string;
 }
 
 type ClaimVibeNavProp = NativeStackNavigationProp<RootStackParamList, 'ClaimVibe'>;
@@ -99,7 +100,8 @@ export function ClaimVibeScreen() {
         if (details.claimStatus === 'claimed') {
           setClaimState('success');
         } else {
-          setClaimState('ready');
+          // Never overwrite success with ready (stale/cached "pending" response on Android)
+          setClaimState(prev => (prev === 'success' ? 'success' : 'ready'));
         }
         setError(null);
       } catch (err) {
@@ -277,11 +279,12 @@ export function ClaimVibeScreen() {
     claimState === 'signing' ||
     claimState === 'confirming';
 
-  /** True when this vibe is already claimed. Do not use mintAddress — that is set when minted (sent), not when claimed. */
+  /** True when this vibe is already claimed. Use every signal (DB sets these on claim). */
   const isClaimed =
     claimState === 'success' ||
     vibeDetails?.claimStatus === 'claimed' ||
-    !!vibeDetails?.claimedAt;
+    !!vibeDetails?.claimedAt ||
+    !!vibeDetails?.claimerWallet;
 
   const processingMessage =
     claimState === 'preparing'

@@ -365,12 +365,12 @@ export function useVibeApi() {
    */
   const getVibeDetails = useCallback(
     async (vibeId: string): Promise<VibeDetails> => {
-      const response = await fetch(`${API_BASE_URL}/api/vibe/${vibeId}`, {
+      // Cache-bust: Android (OkHttp) often ignores cache: 'no-store'. Unique URL = no cache hit.
+      const url = `${API_BASE_URL}/api/vibe/${vibeId}?_=${Date.now()}`;
+      const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store', // always get fresh claim status (avoid showing "confirm claim" after claiming)
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
       });
 
       if (!response.ok) {
