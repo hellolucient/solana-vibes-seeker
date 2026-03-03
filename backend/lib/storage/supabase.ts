@@ -14,7 +14,13 @@ if (!supabaseUrl || !supabaseKey) {
   console.warn("[Supabase] Missing SUPABASE_URL or SUPABASE_ANON_KEY");
 }
 
-export const supabase = createClient(supabaseUrl || "", supabaseKey || "");
+export const supabase = createClient(supabaseUrl || "", supabaseKey || "", {
+  global: {
+    fetch: (url, options = {}) => {
+      return fetch(url, { ...options, cache: "no-store" as RequestCache });
+    },
+  },
+});
 
 // Database row type (snake_case from Postgres)
 interface VibeRow {

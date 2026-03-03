@@ -58,6 +58,8 @@ interface VibeDetails {
   createdAt?: string;
   claimStatus: "pending" | "claimed";
   mintAddress?: string;
+  claimedAt?: string;
+  claimerWallet?: string;
 }
 
 type ClaimState =
@@ -130,7 +132,20 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
         }
 
         const vibe = await vibeRes.json();
-        setVibeDetails({ ...vibe, imageUrl: vibe.imageUri || vibe.imageUrl });
+        const claimedAt = vibe.claimedAt ?? vibe.claimed_at;
+        const claimerWallet = vibe.claimerWallet ?? vibe.claimer_wallet;
+        const rawStatus = vibe.claimStatus ?? vibe.claim_status;
+        const claimStatus: "pending" | "claimed" =
+          rawStatus === "claimed" || !!claimedAt || !!claimerWallet
+            ? "claimed"
+            : "pending";
+        setVibeDetails({
+          ...vibe,
+          imageUrl: vibe.imageUri || vibe.imageUrl,
+          claimStatus,
+          claimedAt: claimedAt ?? undefined,
+          claimerWallet: claimerWallet ?? undefined,
+        });
 
         if (!xToken && meRes.ok) {
           const me = await meRes.json();
@@ -139,7 +154,7 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
           }
         }
 
-        if (vibe.claimStatus === "claimed") {
+        if (claimStatus === "claimed") {
           setClaimState("success");
         } else {
           setClaimState("ready");
@@ -248,6 +263,12 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
     }
   }, [publicKey, vibeDetails, hasXAuth, xUser, xToken, signTransaction]);
 
+  const isClaimed =
+    claimState === "success" ||
+    vibeDetails?.claimStatus === "claimed" ||
+    !!vibeDetails?.claimedAt ||
+    !!vibeDetails?.claimerWallet;
+
   const imageUrl = vibeDetails?.imageUri;
 
   if (claimState === "loading" || claimState === "error") {
@@ -309,7 +330,7 @@ function ClaimInner({ vibeId }: { vibeId: string }) {
         </div>
 
         {/* Claimed state */}
-        {claimState === "success" ? (
+        {isClaimed ? (
           <div style={styles.claimedSection}>
             <div style={styles.claimedBadge}>
               <p style={styles.claimedBadgeTitle}>✓ Claimed</p>

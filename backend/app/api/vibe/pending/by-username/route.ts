@@ -18,6 +18,13 @@ import {
   getClaimedVibesByUsername,
 } from "@/lib/storage/supabase";
 
+export const dynamic = "force-dynamic";
+
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+  Pragma: "no-cache",
+};
+
 function getSolscanTokenUrl(
   mintAddress: string,
   cluster?: "mainnet" | "devnet"
@@ -32,7 +39,7 @@ export async function GET(req: NextRequest) {
   if (!username || username.trim().length === 0) {
     return NextResponse.json(
       { hasPending: false, hasClaimed: false, error: "Missing username param" },
-      { status: 400 }
+      { status: 400, headers: NO_CACHE_HEADERS }
     );
   }
 
@@ -60,7 +67,7 @@ export async function GET(req: NextRequest) {
       senderWallet:
         first.maskedWallet ??
         first.senderWallet.slice(0, 4) + "…" + first.senderWallet.slice(-4),
-    });
+    }, { headers: NO_CACHE_HEADERS });
   }
 
   // Check for already-claimed vibe(s)
@@ -86,8 +93,8 @@ export async function GET(req: NextRequest) {
       vibeUrl: `${baseUrl}/v/${first.id}`,
       mintAddress: first.mintAddress,
       solscanUrl: first.mintAddress ? getSolscanTokenUrl(first.mintAddress, cluster) : undefined,
-    });
+    }, { headers: NO_CACHE_HEADERS });
   }
 
-  return NextResponse.json({ hasPending: false, hasClaimed: false });
+  return NextResponse.json({ hasPending: false, hasClaimed: false }, { headers: NO_CACHE_HEADERS });
 }
