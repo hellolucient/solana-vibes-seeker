@@ -1,5 +1,6 @@
 /**
  * Get vibe by ID (debug / internal).
+ * Cache-Control: no-store so clients always get fresh claim status after claiming.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,5 +15,9 @@ export async function GET(
   if (!vibe) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json(vibe);
+  const headers = {
+    "Cache-Control": "no-store, no-cache, must-revalidate",
+    Pragma: "no-cache",
+  };
+  return NextResponse.json(vibe, { headers });
 }

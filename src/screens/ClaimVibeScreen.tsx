@@ -90,28 +90,32 @@ export function ClaimVibeScreen() {
 
   // Refetch vibe details when screen gains focus so "View your vibe" from home
   // always shows current claim status (e.g. after claiming and returning).
-  const refreshDetails = useCallback(async () => {
-    try {
-      const details = await getVibeDetails(vibeId);
-      setVibeDetails(details);
-      if (details.claimStatus === 'claimed') {
-        setClaimState('success');
-      } else {
-        setClaimState('ready');
+  const refreshDetails = useCallback(
+    async (showLoadingWhileRefetch = false) => {
+      if (showLoadingWhileRefetch) setClaimState('loading');
+      try {
+        const details = await getVibeDetails(vibeId);
+        setVibeDetails(details);
+        if (details.claimStatus === 'claimed') {
+          setClaimState('success');
+        } else {
+          setClaimState('ready');
+        }
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch vibe details:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load vibe');
+        setClaimState('error');
       }
-      setError(null);
-    } catch (err) {
-      console.error('Failed to fetch vibe details:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load vibe');
-      setClaimState('error');
-    }
-  }, [vibeId, getVibeDetails]);
+    },
+    [vibeId, getVibeDetails],
+  );
 
-  // Refetch on mount and whenever screen gains focus (e.g. "View your vibe" from home)
-  // so we always show current claim status.
+  // Load on mount and refetch when screen gains focus so "View your vibe" from home
+  // always shows current claim status. Show loading during refetch to avoid flashing stale "confirm claim" button.
   useFocusEffect(
     useCallback(() => {
-      refreshDetails();
+      refreshDetails(true);
     }, [refreshDetails]),
   );
 

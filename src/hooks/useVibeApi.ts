@@ -370,6 +370,7 @@ export function useVibeApi() {
         headers: {
           'Content-Type': 'application/json',
         },
+        cache: 'no-store', // always get fresh claim status (avoid showing "confirm claim" after claiming)
       });
 
       if (!response.ok) {
@@ -379,13 +380,14 @@ export function useVibeApi() {
       }
 
       const data = await response.json();
-      // Normalize claimStatus: backend may return camelCase (claimStatus) or snake_case (claim_status).
-      // Only treat as claimed when status is explicitly 'claimed' or claimedAt is set.
-      // Do NOT use mintAddress to infer claimed — mintAddress is set when the vibe is minted (sent), not when it's claimed.
+      // Normalize claimStatus: backend may return camelCase or snake_case.
+      // Treat as claimed when status is 'claimed', or claimedAt/claimerWallet is set (set by backend on claim).
+      // Do NOT use mintAddress — it is set when the vibe is minted (sent), not when it's claimed.
       const rawStatus = data.claimStatus ?? data.claim_status;
       const claimedAt = data.claimedAt ?? data.claimed_at;
+      const claimerWallet = data.claimerWallet ?? data.claimer_wallet;
       const claimStatus: 'pending' | 'claimed' =
-        rawStatus === 'claimed' || !!claimedAt ? 'claimed' : 'pending';
+        rawStatus === 'claimed' || !!claimedAt || !!claimerWallet ? 'claimed' : 'pending';
       return {
         ...data,
         imageUrl: data.imageUri || data.imageUrl || '',
