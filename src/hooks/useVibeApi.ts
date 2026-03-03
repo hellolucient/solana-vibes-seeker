@@ -379,10 +379,24 @@ export function useVibeApi() {
       }
 
       const data = await response.json();
-      // Map backend field names to what the app expects
+      // Normalize claimStatus: backend may return camelCase (claimStatus) or snake_case (claim_status).
+      // Also treat presence of mintAddress/claimedAt as claimed when status is missing.
+      const rawStatus = data.claimStatus ?? data.claim_status;
+      const claimedAt = data.claimedAt ?? data.claimed_at;
+      const hasClaimedSignals = !!(data.mintAddress ?? claimedAt);
+      const claimStatus: 'pending' | 'claimed' =
+        rawStatus === 'claimed' || (hasClaimedSignals && rawStatus !== 'pending')
+          ? 'claimed'
+          : rawStatus === 'pending'
+            ? 'pending'
+            : hasClaimedSignals
+              ? 'claimed'
+              : 'pending';
       return {
         ...data,
         imageUrl: data.imageUri || data.imageUrl || '',
+        claimStatus,
+        claimedAt: claimedAt ?? undefined,
       };
     },
     [],

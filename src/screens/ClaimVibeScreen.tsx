@@ -50,6 +50,7 @@ interface VibeDetails {
   claimStatus: 'pending' | 'claimed';
   mintAddress?: string;
   createdAt?: string;
+  claimedAt?: string;
 }
 
 type ClaimVibeNavProp = NativeStackNavigationProp<RootStackParamList, 'ClaimVibe'>;
@@ -265,6 +266,12 @@ export function ClaimVibeScreen() {
     claimState === 'signing' ||
     claimState === 'confirming';
 
+  /** True when this vibe is already claimed (from API claimStatus or from mint/claimedAt). */
+  const isClaimed =
+    claimState === 'success' ||
+    (vibeDetails?.claimStatus === 'claimed') ||
+    !!(vibeDetails?.mintAddress ?? vibeDetails?.claimedAt);
+
   const processingMessage =
     claimState === 'preparing'
       ? 'Preparing claim...'
@@ -394,7 +401,7 @@ export function ClaimVibeScreen() {
         </View>
 
         {/* Claimed state — also when opening an already-claimed vibe from your_vibes */}
-        {claimState === 'success' || (vibeDetails && vibeDetails.claimStatus === 'claimed') ? (
+        {isClaimed ? (
           <View style={styles.claimedSection}>
             <View style={styles.claimedBadge}>
               <Text style={styles.claimedBadgeTitle}>✓ Claimed</Text>
@@ -430,7 +437,7 @@ export function ClaimVibeScreen() {
             )}
 
             {/* Show claim UI only when loaded and this vibe is not already claimed */}
-            {vibeDetails && vibeDetails.claimStatus !== 'claimed' && (
+            {vibeDetails && !isClaimed && (
               <>
                 {/* Connect wallet if needed */}
                 {!connected ? (
