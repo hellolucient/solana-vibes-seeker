@@ -380,18 +380,12 @@ export function useVibeApi() {
 
       const data = await response.json();
       // Normalize claimStatus: backend may return camelCase (claimStatus) or snake_case (claim_status).
-      // Also treat presence of mintAddress/claimedAt as claimed when status is missing.
+      // Only treat as claimed when status is explicitly 'claimed' or claimedAt is set.
+      // Do NOT use mintAddress to infer claimed — mintAddress is set when the vibe is minted (sent), not when it's claimed.
       const rawStatus = data.claimStatus ?? data.claim_status;
       const claimedAt = data.claimedAt ?? data.claimed_at;
-      const hasClaimedSignals = !!(data.mintAddress ?? claimedAt);
       const claimStatus: 'pending' | 'claimed' =
-        rawStatus === 'claimed' || (hasClaimedSignals && rawStatus !== 'pending')
-          ? 'claimed'
-          : rawStatus === 'pending'
-            ? 'pending'
-            : hasClaimedSignals
-              ? 'claimed'
-              : 'pending';
+        rawStatus === 'claimed' || !!claimedAt ? 'claimed' : 'pending';
       return {
         ...data,
         imageUrl: data.imageUri || data.imageUrl || '',

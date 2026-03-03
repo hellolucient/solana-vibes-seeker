@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useRoute, useNavigation} from '@react-navigation/native';
+import {useRoute, useNavigation, useFocusEffect} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {RouteProp} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -88,25 +88,32 @@ export function ClaimVibeScreen() {
     });
   }, []);
 
-  // Fetch vibe details on mount
-  useEffect(() => {
-    async function fetchDetails() {
-      try {
-        const details = await getVibeDetails(vibeId);
-        setVibeDetails(details);
-        if (details.claimStatus === 'claimed') {
-          setClaimState('success');
-        } else {
-          setClaimState('ready');
-        }
-      } catch (err) {
-        console.error('Failed to fetch vibe details:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load vibe');
-        setClaimState('error');
+  // Refetch vibe details when screen gains focus so "View your vibe" from home
+  // always shows current claim status (e.g. after claiming and returning).
+  const refreshDetails = useCallback(async () => {
+    try {
+      const details = await getVibeDetails(vibeId);
+      setVibeDetails(details);
+      if (details.claimStatus === 'claimed') {
+        setClaimState('success');
+      } else {
+        setClaimState('ready');
       }
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch vibe details:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load vibe');
+      setClaimState('error');
     }
-    fetchDetails();
   }, [vibeId, getVibeDetails]);
+
+  // Refetch on mount and whenever screen gains focus (e.g. "View your vibe" from home)
+  // so we always show current claim status.
+  useFocusEffect(
+    useCallback(() => {
+      refreshDetails();
+    }, [refreshDetails]),
+  );
 
   // Fetch pending list for this user (for multi-claim)
   useEffect(() => {
@@ -266,11 +273,11 @@ export function ClaimVibeScreen() {
     claimState === 'signing' ||
     claimState === 'confirming';
 
-  /** True when this vibe is already claimed (from API claimStatus or from mint/claimedAt). */
+  /** True when this vibe is already claimed. Do not use mintAddress — that is set when minted (sent), not when claimed. */
   const isClaimed =
     claimState === 'success' ||
-    (vibeDetails?.claimStatus === 'claimed') ||
-    !!(vibeDetails?.mintAddress ?? vibeDetails?.claimedAt);
+    vibeDetails?.claimStatus === 'claimed' ||
+    !!vibeDetails?.claimedAt;
 
   const processingMessage =
     claimState === 'preparing'
