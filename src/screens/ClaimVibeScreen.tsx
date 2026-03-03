@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   Platform,
+  Linking,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, useNavigation, useFocusEffect} from '@react-navigation/native';
@@ -274,6 +275,29 @@ export function ClaimVibeScreen() {
     navigation.reset({index: 0, routes: [{name: 'Main'}]});
   };
 
+  const handleThankSender = useCallback(async () => {
+    const vibeUrl = `https://solana-vibes-seeker.vercel.app/v/${vibeId}`;
+    const wallet = vibeDetails?.maskedWallet ?? '';
+    const tweetBody = `Just claimed my solana_vibes! 🌊✨ Thanks for the vibe${wallet ? `, ${wallet}` : ''}!\n\n${vibeUrl}`;
+
+    const xAppUrl = `twitter://post?message=${encodeURIComponent(tweetBody)}`;
+    try {
+      const canOpenXApp = await Linking.canOpenURL(xAppUrl);
+      if (canOpenXApp) {
+        await Linking.openURL(xAppUrl);
+        return;
+      }
+    } catch {
+      // X app not available, fall back below
+    }
+
+    const text = encodeURIComponent(
+      `Just claimed my solana_vibes! 🌊✨ Thanks for the vibe${wallet ? `, ${wallet}` : ''}!`,
+    );
+    const url = encodeURIComponent(vibeUrl);
+    Linking.openURL(`https://x.com/intent/post?text=${text}&url=${url}`);
+  }, [vibeId, vibeDetails?.maskedWallet]);
+
   const isProcessing =
     claimState === 'preparing' ||
     claimState === 'signing' ||
@@ -424,7 +448,7 @@ export function ClaimVibeScreen() {
 
             <View style={styles.spreadSection}>
               <Text style={styles.spreadTitle}>Spread the vibes! 🌊</Text>
-              <TouchableOpacity style={styles.btnOutline}>
+              <TouchableOpacity style={styles.btnOutline} onPress={handleThankSender}>
                 <Text style={styles.btnOutlineIcon}>𝕏</Text>
                 <Text style={styles.btnOutlineText}>Thank the sender</Text>
               </TouchableOpacity>
