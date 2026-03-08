@@ -22,6 +22,13 @@ export default function HomePage() {
         <Link href="/leaderboard" style={styles.link}>
           Leaderboard →
         </Link>
+        <div style={styles.legalLinks}>
+          <Link href="/legal/license" style={styles.legalLink}>License</Link>
+          <span style={styles.legalSep}> · </span>
+          <Link href="/legal/copyright" style={styles.legalLink}>Copyright</Link>
+          <span style={styles.legalSep}> · </span>
+          <Link href="/legal/privacy" style={styles.legalLink}>Privacy</Link>
+        </div>
       </div>
     </div>
   );
@@ -78,5 +85,17 @@ const styles: Record<string, React.CSSProperties> = {
     color: "rgba(255,255,255,0.5)",
     fontSize: 14,
     textDecoration: "none",
+  },
+  legalLinks: {
+    marginTop: 24,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.4)",
+  },
+  legalLink: {
+    color: "rgba(255,255,255,0.5)",
+    textDecoration: "none",
+  },
+  legalSep: {
+    color: "rgba(255,255,255,0.3)",
   },
 };
