@@ -4,5 +4,14 @@
       "path": "/api/internal/supabase-keepalive",
       "schedule": "0 9 * * *"
     }
+  ],
+  "headers": [
+    {
+      "source": "/app-release.apk",
+      "headers": [
+        { "key": "Content-Type", "value": "application/vnd.android.package-archive" },
+        { "key": "Content-Disposition", "value": "inline; filename=\"app-release.apk\"" }
+      ]
+    }
   ]
 }
