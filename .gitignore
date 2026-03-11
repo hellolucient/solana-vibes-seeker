@@ -30,6 +30,7 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+android/app/keystore.properties
 
 # Node
 node_modules/
@@ -65,3 +66,6 @@ coverage/
 # APK/AAB
 *.apk
 *.aab
+# Allow release APK so it deploys to Vercel and is installable via URL
+!backend/public/app-release.apk
+.vercel
